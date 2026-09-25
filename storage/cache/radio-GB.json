@@ -1,0 +1,127 @@
+{
+    "cachedAt": "2026-07-26T22:59:07+01:00",
+    "stations": [
+        {
+            "id": "gb-bbc-world",
+            "name": "BBC World Service",
+            "country": "GB",
+            "favicon": "",
+            "tags": "news,world",
+            "codec": "MP3",
+            "bitrate": 96,
+            "homepage": "https://www.bbc.co.uk/sounds/play/live:bbc_world_service",
+            "urls": [
+                "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-capital",
+            "name": "Capital UK",
+            "country": "GB",
+            "favicon": "",
+            "tags": "pop,hits",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.capitalfm.com/",
+            "urls": [
+                "https://media-ice.musicradio.com/CapitalUKMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-classic",
+            "name": "Classic FM",
+            "country": "GB",
+            "favicon": "",
+            "tags": "classical",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.classicfm.com/",
+            "urls": [
+                "https://media-ice.musicradio.com/ClassicFMMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-heart",
+            "name": "Heart UK",
+            "country": "GB",
+            "favicon": "",
+            "tags": "pop,hits",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.heart.co.uk/",
+            "urls": [
+                "https://media-ice.musicradio.com/HeartUKMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-lbc",
+            "name": "LBC UK",
+            "country": "GB",
+            "favicon": "",
+            "tags": "news,talk",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.lbc.co.uk/",
+            "urls": [
+                "https://media-ice.musicradio.com/LBCUKMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-radiox",
+            "name": "Radio X UK",
+            "country": "GB",
+            "favicon": "",
+            "tags": "rock,alternative",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.radiox.co.uk/",
+            "urls": [
+                "https://media-ice.musicradio.com/RadioXUKMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-smooth",
+            "name": "Smooth UK",
+            "country": "GB",
+            "favicon": "",
+            "tags": "easy listening,pop",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.smoothradio.com/",
+            "urls": [
+                "https://media-ice.musicradio.com/SmoothUKMP3"
+            ],
+            "featured": true,
+            "lockUrls": true
+        },
+        {
+            "id": "gb-talksport",
+            "name": "talkSPORT",
+            "country": "GB",
+            "favicon": "",
+            "tags": "sport,talk",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://talksport.com/",
+            "urls": [
+                "https://radio.talksport.com/stream"
+            ],
+            "featured": true,
+            "lockUrls": true
+        }
+    ],
+    "appVersion": "1.2.0",
+    "refreshFailedAt": null
+}

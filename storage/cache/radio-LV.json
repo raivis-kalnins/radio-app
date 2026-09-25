@@ -1,0 +1,145 @@
+{
+    "cachedAt": "2026-07-26T22:58:14+01:00",
+    "stations": [
+        {
+            "id": "lv-ehr",
+            "name": "European Hit Radio",
+            "country": "LV",
+            "favicon": "",
+            "tags": "hits,dance",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://www.ehrhiti.lv/",
+            "urls": [
+                "http://stream.ehrhiti.lv:8000/ehr.mp3",
+                "http://stream.europeanhitradio.com:8000/ehr64"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-lr1",
+            "name": "Latvijas Radio 1",
+            "country": "LV",
+            "favicon": "",
+            "tags": "news,talk,public",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://lr1.lsm.lv/",
+            "urls": [
+                "http://lr1mp1.latvijasradio.lv:8012/stream.mp3",
+                "http://lr1mp1.latvijasradio.lv:8012/"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-lr2",
+            "name": "Latvijas Radio 2",
+            "country": "LV",
+            "favicon": "",
+            "tags": "latvian,music,public",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://lr2.lsm.lv/",
+            "urls": [
+                "http://lr2mp1.latvijasradio.lv:8002/stream.mp3",
+                "http://lr2mp1.latvijasradio.lv:8002/"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-lr3",
+            "name": "Latvijas Radio 3 Klasika",
+            "country": "LV",
+            "favicon": "",
+            "tags": "classical,culture,public",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://klasika.lsm.lv/",
+            "urls": [
+                "http://lr3mp0.latvijasradio.lv:8004/stream.mp3",
+                "http://lr3mp0.latvijasradio.lv:8004/"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-lr4",
+            "name": "Latvijas Radio 4",
+            "country": "LV",
+            "favicon": "",
+            "tags": "russian,news,public",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://lr4.lsm.lv/",
+            "urls": [
+                "http://lr4mp1.latvijasradio.lv:8020/stream.mp3",
+                "http://lr4mp1.latvijasradio.lv:8020/"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-pieci",
+            "name": "Latvijas Radio 5 Pieci",
+            "country": "LV",
+            "favicon": "",
+            "tags": "hits,youth,public",
+            "codec": "MP3",
+            "bitrate": 192,
+            "homepage": "https://pieci.lsm.lv/",
+            "urls": [
+                "https://live.pieci.lv/live19-hq.mp3",
+                "http://live.pieci.lv:8000/live19-hq.mp3"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-skonto",
+            "name": "Radio Skonto",
+            "country": "LV",
+            "favicon": "",
+            "tags": "pop,news,talk,latvian",
+            "codec": "MP3",
+            "bitrate": 128,
+            "homepage": "https://radioskonto.lv/",
+            "urls": [
+                "https://stream.rcast.net/236428",
+                "http://stream.radioskonto.lv:8002/stereo",
+                "http://skonto.datucentrs.eu/mp3"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        },
+        {
+            "id": "lv-swh",
+            "name": "Radio SWH",
+            "country": "LV",
+            "favicon": "",
+            "tags": "music,talk",
+            "codec": "MP3",
+            "bitrate": 192,
+            "homepage": "https://radioswh.lv/",
+            "urls": [
+                "https://live.radioswh.lv:8443/swhmp3",
+                "https://stream.radioswh.lv:8443/swhmp3",
+                "http://80.232.162.149:8000/swh96mp3"
+            ],
+            "featured": true,
+            "lockUrls": true,
+            "relayFollowRedirects": true
+        }
+    ],
+    "appVersion": "1.2.0",
+    "refreshFailedAt": null
+}

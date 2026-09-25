@@ -1,0 +1,18 @@
+[
+    {
+        "id": "USR-20260727111327-BB4554ED",
+        "fullName": "go-app Administrator",
+        "email": "admin@go-app.local",
+        "username": "admin",
+        "passwordHash": "$2y$12$ds9mERZtTxQQ8aaKbFNxauPdtKsGRxqrMOE7G.IodI0r0rissMAHC",
+        "role": "admin",
+        "plan": "pro",
+        "status": "active",
+        "language": "en",
+        "createdAt": "2026-07-27T11:13:27+01:00",
+        "lastLoginAt": null,
+        "passwordChangedAt": null,
+        "requestedPlan": "pro",
+        "approvedAt": "2026-07-27T11:13:27+01:00"
+    }
+]

@@ -1,0 +1,1 @@
+(function(){'use strict';try{var t=localStorage.getItem('go-app-theme')==='night'?'theme-night':'theme-day';document.documentElement.classList.add(t);}catch(e){document.documentElement.classList.add('theme-day');}}());
