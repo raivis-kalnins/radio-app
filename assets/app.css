@@ -1643,11 +1643,15 @@ html.is-landscape .road-alert-card,html.force-landscape .road-alert-card{right:c
 .radio63-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;margin-bottom:12px;}
 .radio63-search{margin:0;}
 .radio63-offline-note{padding:10px 12px;margin:0 0 12px;border:1px solid rgba(255,192,84,.35);border-radius:14px;background:rgba(255,192,84,.09);font-size:12px;color:var(--text);}
-.radio63-station{display:grid!important;grid-template-columns:minmax(0,1fr) 52px;gap:0;padding:0!important;overflow:hidden;}
+.radio63-station{display:grid!important;grid-template-columns:minmax(0,1fr) 88px;gap:0;padding:0!important;overflow:hidden;}
 .radio63-station-play{border:0;background:transparent;color:inherit;display:grid;grid-template-columns:48px minmax(0,1fr) 42px;gap:10px;align-items:center;text-align:left;padding:10px 6px 10px 10px;min-width:0;}
 .radio63-station-copy{min-width:0;}.radio63-station-copy h3,.radio63-station-copy p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.radio63-favourite{border:0;border-left:1px solid var(--line);background:transparent;color:var(--muted);font-size:28px;min-height:68px;}
+.radio63-station-actions{display:grid;grid-template-columns:44px 44px;border-left:1px solid var(--line);min-height:68px;}
+.radio63-station-actions button{border:0;background:transparent;min-width:0;min-height:68px;}
+.radio63-favourite{color:var(--muted);font-size:25px;}
 .radio63-favourite.active{color:#ffd45a;}
+.radio63-remove{border-left:1px solid var(--line)!important;color:#ff9d97!important;font-size:28px;font-weight:400;line-height:1;}
+.radio63-remove:hover,.radio63-remove:focus-visible{background:rgba(255,92,84,.10)!important;color:#ffd0cc!important;}
 .radio63-shell .player-bar{z-index:95;}
 @media(max-width:560px){.radio63-toolbar{grid-template-columns:1fr}.radio63-country-tabs button span:last-child{display:none}.radio63-country-tabs button{min-height:48px}.radio63-country-tabs .country-flag{font-size:23px}}
 
@@ -2056,4 +2060,38 @@ html.theme-day #go-app-root{
   .radio63-toolbar{grid-template-columns:1fr!important;}
   .radio63-directory-search{grid-template-columns:1fr;}
   .radio63-directory-results{grid-template-columns:1fr;max-height:55vh;}
+}
+
+
+/* v1.3.2: removable stations + BBC Radio 2 HLS fix */
+@media(max-width:420px){.radio63-station{grid-template-columns:minmax(0,1fr) 80px!important}.radio63-station-actions{grid-template-columns:40px 40px}.radio63-station-actions button{min-height:68px}.radio63-station-play{grid-template-columns:44px minmax(0,1fr) 38px;gap:8px;padding-left:8px}}
+
+/* v1.3.3: Android/Chrome first-run page must have one bounded vertical scroll container. */
+.welcome-root:has(>.radio63-welcome-shell){
+  height:100%!important;
+  min-height:100%!important;
+  max-height:100%!important;
+  overflow:hidden!important;
+}
+.welcome-root>.radio63-welcome-shell{
+  height:100%!important;
+  min-height:0!important;
+  max-height:100%!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-y:auto!important;
+  touch-action:pan-y!important;
+  scroll-behavior:auto!important;
+}
+.welcome-root>.radio63-welcome-shell>.radio63-welcome-card{
+  min-height:max-content!important;
+  padding-bottom:calc(18px + var(--safe-bottom))!important;
+}
+@supports (height:100dvh){
+  .welcome-root:has(>.radio63-welcome-shell){
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:100dvh!important;
+  }
 }
