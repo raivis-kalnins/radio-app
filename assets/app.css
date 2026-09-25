@@ -1799,3 +1799,261 @@ html.address-entry-active .radio63-shell .app-content{
 @media(max-width:760px){
   .radio63-view{padding-left:10px!important;padding-right:10px!important;}
 }
+
+
+/* v1.2.4: Radio 63 home uses the same product geometry as GO 63. */
+.radio63-view{
+  width:min(1120px,100%)!important;
+  max-width:1120px!important;
+  margin:0 auto!important;
+  padding:calc(18px + var(--safe-top)) 0 calc(30px + var(--safe-bottom))!important;
+}
+.radio63-brandbar{
+  min-height:76px!important;
+  padding:10px 2px 6px!important;
+  margin:0 0 14px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+}
+.radio63-brandbar>img{width:300px!important;max-width:58vw!important;height:auto!important;}
+.radio63-brandbar .radio63-go-link{min-height:48px!important;padding:10px 16px!important;border-radius:16px!important;}
+.radio63-home{
+  width:100%!important;
+  min-height:286px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 280px!important;
+  align-items:center!important;
+  gap:30px!important;
+  padding:34px 38px!important;
+  margin:0 0 14px!important;
+  border-radius:28px!important;
+  background:linear-gradient(135deg,rgba(10,31,38,.98),rgba(16,63,54,.86))!important;
+}
+.radio63-home-copy{max-width:720px!important;}
+.radio63-home h1{font-size:clamp(44px,5vw,68px)!important;line-height:.94!important;letter-spacing:-.055em!important;max-width:12ch!important;margin:12px 0!important;}
+.radio63-home p{font-size:16px!important;line-height:1.6!important;max-width:62ch!important;}
+.radio63-home-badge{width:172px!important;height:172px!important;justify-self:center!important;align-self:center!important;}
+.radio63-home-badge:before{background-size:contain!important;}
+.radio63-home-actions{display:flex!important;flex-wrap:wrap!important;gap:10px!important;margin-top:20px!important;}
+.radio63-home-actions .btn{min-width:190px!important;min-height:52px!important;}
+.radio63-country-tabs,.radio63-toolbar,.radio63-offline-note,.radio63-stations{width:100%!important;max-width:100%!important;}
+html.is-landscape .radio63-shell .app-content,
+html.force-landscape .radio63-shell .app-content{padding-right:0!important;padding-left:0!important;}
+@media(max-width:920px){
+  .radio63-view{padding-left:16px!important;padding-right:16px!important;}
+  .radio63-home{grid-template-columns:1fr!important;padding:26px 24px!important;min-height:0!important;}
+  .radio63-home-badge{display:none!important;}
+}
+@media(max-width:560px){
+  .radio63-view{padding-left:10px!important;padding-right:10px!important;}
+  .radio63-brandbar{min-height:62px!important;}
+  .radio63-brandbar>img{width:230px!important;}
+  .radio63-home{padding:22px 18px!important;border-radius:22px!important;}
+  .radio63-home h1{font-size:clamp(36px,11vw,50px)!important;max-width:9ch!important;}
+  .radio63-home p{font-size:14px!important;}
+  .radio63-home-actions{display:grid!important;grid-template-columns:1fr!important;}
+  .radio63-home-actions .btn{width:100%!important;min-width:0!important;}
+}
+
+/* v1.2.5: Radio 63 home follows the same visual frame as GO 63 Navigator. */
+.radio63-shell{background:
+  radial-gradient(circle at 82% 8%,rgba(45,204,119,.18),transparent 34%),
+  radial-gradient(circle at 8% 72%,rgba(76,201,240,.10),transparent 38%),
+  #071418!important;}
+.radio63-shell .app-content{padding:0 0 calc(96px + var(--safe-bottom))!important;overflow-y:auto!important;overflow-x:hidden!important;}
+.radio63-view{
+  width:min(1120px,calc(100% - 32px))!important;
+  max-width:1120px!important;
+  margin:0 auto!important;
+  padding:calc(18px + var(--safe-top)) 0 calc(30px + var(--safe-bottom))!important;
+  overflow:visible!important;
+  background:transparent!important;
+}
+.radio63-brandbar{
+  min-height:76px!important;
+  padding:10px 2px 6px!important;
+  margin:0 0 14px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+}
+.radio63-brandbar>img{width:300px!important;max-width:58vw!important;height:auto!important;}
+.radio63-brandbar .radio63-go-link{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:48px!important;
+  padding:10px 16px!important;
+  border-radius:16px!important;
+  background:rgba(10,29,34,.78)!important;
+  border:1px solid rgba(255,255,255,.13)!important;
+  white-space:nowrap!important;
+}
+.radio63-brandbar .radio63-go-link img{width:28px!important;height:28px!important;}
+.radio63-home{
+  width:100%!important;
+  min-height:286px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 280px!important;
+  align-items:center!important;
+  gap:30px!important;
+  padding:34px 38px!important;
+  margin:0 0 14px!important;
+  border:1px solid rgba(255,255,255,.11)!important;
+  border-radius:28px!important;
+  background:linear-gradient(135deg,rgba(10,31,38,.98),rgba(16,63,54,.86))!important;
+  box-shadow:0 20px 52px rgba(0,0,0,.24)!important;
+  position:relative!important;
+  overflow:hidden!important;
+}
+.radio63-home:after{
+  content:""!important;
+  position:absolute!important;
+  width:440px!important;
+  height:440px!important;
+  right:-130px!important;
+  bottom:-250px!important;
+  border-radius:50%!important;
+  background:radial-gradient(circle,rgba(109,245,139,.20),transparent 66%)!important;
+  pointer-events:none!important;
+}
+.radio63-home-copy{position:relative!important;z-index:2!important;max-width:720px!important;}
+.radio63-home .eyebrow{
+  display:inline-flex!important;
+  align-items:center!important;
+  min-height:28px!important;
+  padding:5px 10px!important;
+  border:1px solid rgba(109,245,139,.24)!important;
+  border-radius:999px!important;
+  background:rgba(109,245,139,.08)!important;
+}
+.radio63-home h1{
+  font-size:clamp(44px,5vw,68px)!important;
+  line-height:.94!important;
+  letter-spacing:-.055em!important;
+  max-width:12ch!important;
+  margin:12px 0!important;
+}
+.radio63-home p{font-size:16px!important;line-height:1.6!important;max-width:62ch!important;color:var(--muted)!important;}
+.radio63-home-actions{display:flex!important;flex-wrap:wrap!important;gap:10px!important;margin-top:20px!important;}
+.radio63-home-actions .btn{min-width:190px!important;min-height:52px!important;}
+.radio63-home-badge{
+  position:relative!important;
+  z-index:2!important;
+  width:172px!important;
+  height:172px!important;
+  justify-self:center!important;
+  align-self:center!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:50%!important;
+  background:radial-gradient(circle,rgba(109,245,139,.18),rgba(10,68,51,.35) 50%,transparent 70%)!important;
+  box-shadow:inset 0 0 0 1px rgba(109,245,139,.10)!important;
+}
+.radio63-home-badge:before{inset:22px!important;background:url('radio63-icon.svg') no-repeat center/contain!important;filter:drop-shadow(0 18px 28px rgba(0,0,0,.34))!important;}
+.radio63-country-tabs,.radio63-toolbar,.radio63-offline-note,.radio63-stations{width:100%!important;max-width:100%!important;margin-left:0!important;margin-right:0!important;}
+html.is-landscape .radio63-shell .app-content,
+html.force-landscape .radio63-shell .app-content,
+html.is-landscape .radio63-view,
+html.force-landscape .radio63-view{padding-right:0!important;}
+@media(max-width:920px){
+  .radio63-view{width:min(100% - 24px,1120px)!important;}
+  .radio63-home{grid-template-columns:1fr!important;padding:26px 24px!important;min-height:0!important;}
+  .radio63-home-badge{display:none!important;}
+}
+@media(max-width:560px){
+  .radio63-view{width:calc(100% - 20px)!important;}
+  .radio63-brandbar{min-height:62px!important;}
+  .radio63-brandbar>img{width:230px!important;max-width:68vw!important;}
+  .radio63-brandbar .radio63-go-link{font-size:0!important;padding:9px 11px!important;}
+  .radio63-brandbar .radio63-go-link:after{content:'GO 63';font-size:11px!important;}
+  .radio63-home{padding:22px 18px!important;border-radius:22px!important;}
+  .radio63-home h1{font-size:clamp(36px,11vw,50px)!important;max-width:9ch!important;}
+  .radio63-home p{font-size:14px!important;}
+  .radio63-home-actions{display:grid!important;grid-template-columns:1fr!important;}
+  .radio63-home-actions .btn{width:100%!important;min-width:0!important;}
+}
+
+
+/* v1.2.6: Radio-only first-run home; never show inherited GO landing styling. */
+.radio63-welcome-shell{
+  min-height:100%;height:auto!important;overflow:auto!important;
+  background:radial-gradient(circle at 82% 8%,rgba(45,204,119,.18),transparent 34%),radial-gradient(circle at 8% 72%,rgba(76,201,240,.10),transparent 38%),#071418!important;
+  padding:calc(18px + var(--safe-top)) 16px calc(30px + var(--safe-bottom))!important;
+}
+.radio63-welcome-card{width:min(1120px,100%)!important;max-width:1120px!important;min-height:0!important;margin:0 auto!important;padding:0!important;display:grid!important;gap:14px!important;}
+.radio63-welcome-brandbar{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 2px 6px;}
+.radio63-welcome-brandbar>img{width:300px;max-width:58vw;height:auto;}
+.radio63-welcome-go{display:inline-flex;align-items:center;gap:9px;text-decoration:none;padding:10px 15px;min-height:48px;border-radius:16px;border:1px solid var(--line);background:rgba(10,29,34,.78);font-size:12px;font-weight:800;white-space:nowrap;}
+.radio63-welcome-go img{width:27px;height:27px;object-fit:contain;}
+.radio63-welcome-hero{min-height:286px;display:grid;grid-template-columns:minmax(0,1fr) 280px;align-items:center;gap:30px;padding:34px 38px;border:1px solid rgba(255,255,255,.11);border-radius:28px;background:linear-gradient(135deg,rgba(10,31,38,.98),rgba(16,63,54,.86));box-shadow:0 20px 52px rgba(0,0,0,.24);overflow:hidden;position:relative;}
+.radio63-welcome-hero:after{content:"";position:absolute;width:440px;height:440px;right:-130px;bottom:-250px;border-radius:50%;background:radial-gradient(circle,rgba(109,245,139,.20),transparent 66%);pointer-events:none;}
+.radio63-welcome-copy{position:relative;z-index:2;min-width:0;}
+.radio63-welcome-copy .eyebrow{display:inline-flex;min-height:28px;align-items:center;padding:5px 10px;border:1px solid rgba(109,245,139,.24);border-radius:999px;background:rgba(109,245,139,.08);}
+.radio63-welcome-copy h1{font-size:clamp(44px,5vw,68px);line-height:.94;letter-spacing:-.055em;max-width:11ch;margin:12px 0;}
+.radio63-welcome-copy>p{font-size:16px;line-height:1.6;color:var(--muted);max-width:62ch;margin:0;}
+.radio63-welcome-features{display:flex!important;flex-wrap:wrap;gap:8px;margin-top:18px;}
+.radio63-welcome-features span{min-height:38px;padding:8px 12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.04);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+.radio63-welcome-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;}
+.radio63-welcome-actions .btn{min-width:190px;text-decoration:none;}
+.radio63-welcome-visual{position:relative;z-index:2;display:grid;justify-items:center;gap:8px;text-align:center;color:#fff;}
+.radio63-welcome-visual img{width:150px;height:150px;filter:drop-shadow(0 18px 28px rgba(0,0,0,.34));}
+.radio63-welcome-visual strong{font-size:20px;}
+.radio63-welcome-visual span{font-size:11px;color:var(--muted);letter-spacing:.08em;}
+.radio63-welcome-card>.language-select,.radio63-welcome-card>.language-switch{width:100%!important;}
+.radio63-welcome-crosslink{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 18px;border:1px solid var(--line);border-radius:20px;background:rgba(10,29,34,.76);text-decoration:none;}
+.radio63-welcome-crosslink strong{display:block;font-size:14px;}.radio63-welcome-crosslink span{display:block;margin-top:4px;color:var(--muted);font-size:12px;}.radio63-welcome-crosslink img{width:130px;max-width:40vw;height:auto;}
+.radio63-welcome-trust{margin:0!important;}
+.radio63-welcome-card>.welcome-actions{grid-template-columns:1fr 1fr!important;}
+@media(max-width:920px){.radio63-welcome-hero{grid-template-columns:1fr;min-height:0;padding:26px 24px}.radio63-welcome-visual{display:none}.radio63-welcome-brandbar>img{width:260px}.radio63-welcome-copy h1{max-width:9ch}.radio63-welcome-card{width:min(100%,760px)!important;}}
+@media(max-width:560px){.radio63-welcome-shell{padding-left:10px!important;padding-right:10px!important}.radio63-welcome-brandbar{min-height:62px}.radio63-welcome-brandbar>img{width:225px;max-width:68vw}.radio63-welcome-go{font-size:0;padding:9px 11px}.radio63-welcome-go:after{content:'GO 63';font-size:11px}.radio63-welcome-hero{padding:22px 18px;border-radius:22px}.radio63-welcome-copy h1{font-size:clamp(36px,11vw,50px)}.radio63-welcome-copy>p{font-size:14px}.radio63-welcome-actions{display:grid;grid-template-columns:1fr}.radio63-welcome-actions .btn{width:100%;min-width:0}.radio63-welcome-crosslink img{width:100px}.radio63-welcome-card>.welcome-actions{grid-template-columns:1fr!important;}}
+
+/* v1.2.7: keep the Radio 63 first-run screen dark to the physical viewport edge. */
+html,body,#go-app-root{
+  background:#071418!important;
+  min-height:100vh!important;
+  min-height:100dvh!important;
+}
+.welcome-root:has(.radio63-welcome-shell),
+.radio63-welcome-shell{
+  background:radial-gradient(circle at 82% 8%,rgba(45,204,119,.18),transparent 34%),radial-gradient(circle at 8% 72%,rgba(76,201,240,.10),transparent 38%),#071418!important;
+}
+.welcome-root:has(.radio63-welcome-shell){
+  min-height:100vh!important;
+  min-height:100dvh!important;
+  height:auto!important;
+}
+.radio63-welcome-shell{
+  width:100%!important;
+  min-height:100vh!important;
+  min-height:100dvh!important;
+  box-sizing:border-box!important;
+}
+html.theme-day body.app-body,
+html.theme-day #go-app-root{
+  background:#071418!important;
+}
+
+/* v1.3.1: live directory + fully localized Radio 63 station screen */
+.radio63-toolbar{grid-template-columns:auto minmax(220px,1fr) auto!important;gap:10px!important;}
+.radio63-add-stations{white-space:nowrap;}
+.radio63-directory{max-width:none!important;width:100%;margin:4px 0 16px!important;padding:16px;background:rgba(7,22,27,.86)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);}
+.radio63-directory-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px;}
+.radio63-directory-head strong{display:block;font-size:16px;}
+.radio63-directory-head p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.5;max-width:72ch;}
+.radio63-directory-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:12px;}
+.radio63-directory-search .search-box{margin:0;}
+.radio63-directory-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:430px;overflow:auto;padding-right:2px;}
+.radio63-directory-row{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.035);}
+.radio63-directory-row .station-logo{width:46px;height:46px;border-radius:13px;}
+.radio63-directory-copy{min-width:0;}
+.radio63-directory-copy strong,.radio63-directory-copy span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.radio63-directory-copy strong{font-size:13px;}
+.radio63-directory-copy span{margin-top:4px;color:var(--muted);font-size:10px;}
+@media(max-width:760px){
+  .radio63-toolbar{grid-template-columns:1fr!important;}
+  .radio63-directory-search{grid-template-columns:1fr;}
+  .radio63-directory-results{grid-template-columns:1fr;max-height:55vh;}
+}

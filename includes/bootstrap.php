@@ -165,7 +165,7 @@ function go_security_headers(): void
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: geolocation=(self), camera=(), microphone=()');
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; connect-src 'self' https: https://hcaptcha.com https://*.hcaptcha.com; media-src 'self' https: http: blob:; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://hcaptcha.com https://*.hcaptcha.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com; script-src 'self' https://cdn.jsdelivr.net https://hcaptcha.com https://*.hcaptcha.com; connect-src 'self' https: https://hcaptcha.com https://*.hcaptcha.com; media-src 'self' https: http: blob:; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://hcaptcha.com https://*.hcaptcha.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
 }
 
 function go_read_json(string $path, mixed $default = []): mixed

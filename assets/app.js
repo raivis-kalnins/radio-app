@@ -1165,6 +1165,7 @@
 
   GoApp.prototype.setupAudio = function (attempt) {
     var self = this, expected = attempt == null ? this.streamAttempt : attempt;
+    if (this.hls) { try { this.hls.destroy(); } catch (_) {} this.hls = null; }
     if (this.audio) {
       try { this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load(); } catch (_) {}
     }
@@ -1491,7 +1492,7 @@
   GoApp.prototype.loadRadioStations = function (country) {
     var self = this;
     localStorage.setItem('go-app-radio-country', country);
-    this.setState({radioCountry:country, radioLoading:true, radioStations:[], radioSearch:''});
+    this.setState({radioCountry:country, radioLoading:true, radioStations:[], radioSearch:'', radio63DirectoryResults:[], radio63DirectoryQuery:'', radio63DirectoryOpen:false});
     this.api('radio_stations', {params:{country:country}}).then(function (data) {
       self.setState({radioStations:data.stations || [], radioSource:data.source || '', radioLoading:false});
     }).catch(function (error) {
@@ -1499,22 +1500,30 @@
     });
   };
 
+  function radio63LooksLikeHls(url) {
+    var value=String(url||'').toLowerCase();
+    return /\.m3u8(?:$|[?#])/.test(value) || value.indexOf('ihrhls')>=0 || value.indexOf('/hls/')>=0 || value.indexOf('hls-live')>=0 || value.indexOf('playlist.m3u8')>=0;
+  }
+
   GoApp.prototype.buildStreamCandidates = function (station) {
     var direct = Array.isArray(station.urls) ? station.urls : [];
     var relays = Array.isArray(station.relayUrls) ? station.relayUrls : [];
     var candidates = [];
     direct.forEach(function (url, index) {
-      var relay = relays[index], parsed = null;
+      var relay = relays[index], parsed = null, isHls=radio63LooksLikeHls(url);
       try { parsed = new URL(url, window.location.href); } catch (_) {}
       var mixedContent = parsed && parsed.protocol === 'http:' && window.location.protocol === 'https:';
       if (mixedContent) {
-        if (relay) candidates.push({url:relay, mode:'relay'});
+        // A normal MP3/AAC stream can safely use our same-origin relay. HLS
+        // manifests cannot be relayed by the byte-stream endpoint because their
+        // segment URLs need playlist-aware rewriting.
+        if (!isHls && relay) candidates.push({url:relay, mode:'relay', hls:false});
         return;
       }
-      candidates.push({url:url, mode:'direct'});
-      if (relay) candidates.push({url:relay, mode:'relay'});
+      candidates.push({url:url, mode:'direct', hls:isHls});
+      if (!isHls && relay) candidates.push({url:relay, mode:'relay', hls:false});
     });
-    relays.slice(direct.length).forEach(function (url) { candidates.push({url:url, mode:'relay'}); });
+    relays.slice(direct.length).forEach(function (url) { candidates.push({url:url, mode:'relay', hls:false}); });
     return candidates.filter(function (candidate, index, all) {
       return candidate.url && all.findIndex(function (item) { return item.url === candidate.url; }) === index;
     });
@@ -1543,17 +1552,46 @@
     if (!this.playerCandidates.length) this.playerCandidates = this.buildStreamCandidates(station);
     if (!this.playerCandidates.length) { this.setPlayerState({status:'failed', playing:false, detail:this.t('radioTapAgain')}); return; }
     var candidate = this.playerCandidates[this.playerUrlIndex % this.playerCandidates.length];
-    var attempt = ++this.streamAttempt;
+    var attempt = ++this.streamAttempt, expected = attempt;
     this.failedStreamAttempt = -1;
     clearTimeout(this.audioTimer);
     this.setupAudio(attempt);
-    this.audio.src = candidate.url;
-    this.audio.load();
     this.setPlayerState({status:this.reconnectAttempt ? 'reconnecting' : 'connecting', playing:false, detail:candidate.mode === 'relay' ? this.t('radioRelay') : this.t('radioDirect')});
-    var promise;
-    try { promise = this.audio.play(); } catch (_) { promise = null; }
+    var isHls=!!candidate.hls || radio63LooksLikeHls(candidate.url);
+    var promise=null;
+    if (isHls && this.audio.canPlayType && this.audio.canPlayType('application/vnd.apple.mpegurl')) {
+      this.audio.src=candidate.url;
+      this.audio.load();
+      try { promise=this.audio.play(); } catch (_) { promise=null; }
+    } else if (isHls && window.Hls && Hls.isSupported()) {
+      try {
+        this.hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:30,maxBufferLength:30});
+        this.hls.attachMedia(this.audio);
+        this.hls.on(Hls.Events.MEDIA_ATTACHED,function(){
+          if(expected!==self.streamAttempt||!self.playerWanted)return;
+          self.hls.loadSource(candidate.url);
+        });
+        this.hls.on(Hls.Events.MANIFEST_PARSED,function(){
+          if(expected!==self.streamAttempt||!self.playerWanted)return;
+          var p=self.audio.play();
+          if(p&&p.catch)p.catch(function(){if(self.playerWanted)self.radioFailure(attempt);});
+        });
+        this.hls.on(Hls.Events.ERROR,function(_,data){
+          if(!data||!data.fatal||expected!==self.streamAttempt||!self.playerWanted)return;
+          try {
+            if(data.type===Hls.ErrorTypes.NETWORK_ERROR){self.hls.startLoad();return;}
+            if(data.type===Hls.ErrorTypes.MEDIA_ERROR){self.hls.recoverMediaError();return;}
+          } catch (_) {}
+          self.radioFailure(attempt);
+        });
+      } catch (_) { self.radioFailure(attempt); }
+    } else {
+      this.audio.src=candidate.url;
+      this.audio.load();
+      try { promise=this.audio.play(); } catch (_) { promise=null; }
+    }
     if (promise && promise.catch) promise.catch(function () { if (self.playerWanted) self.radioFailure(attempt); });
-    this.audioTimer = setTimeout(function () { if (self.playerWanted && !self.state.player.playing) self.radioFailure(attempt); }, candidate.mode === 'relay' ? 14000 : 10000);
+    this.audioTimer = setTimeout(function () { if (self.playerWanted && !self.state.player.playing) self.radioFailure(attempt); }, isHls ? 16000 : (candidate.mode === 'relay' ? 14000 : 10000));
   };
 
   GoApp.prototype.scheduleRadioFailure = function (delay, attempt) {
@@ -1590,6 +1628,7 @@
 
   GoApp.prototype.pausePlayer = function () {
     this.playerWanted = false; clearTimeout(this.audioTimer); clearTimeout(this.reconnectTimer);
+    if (this.hls) { try { this.hls.destroy(); } catch (_) {} this.hls=null; }
     if (this.audio) this.audio.pause();
     this.setPlayerState({status:'paused', playing:false, detail:''});
   };
@@ -4421,13 +4460,20 @@
 
 
   /* Radio 63 1.0.0: radio-only product. */
+  var RADIO63_TEXT={
+    en:{go:'Open GO 63 Navigator',title:'Your radio for the road',intro:'Listen to popular Latvian, British, Ukrainian, American, Canadian and Australian stations. Add favourites for one-tap access and keep playback running with the screen off where your device supports background media.',browse:'Browse stations',favourites:'Favourites',search:'Search stations',loading:'Loading stations…',none:'No stations found.',noFav:'No favourites in this country yet. Tap ☆ beside a station to add it.',offline:'No internet. Current buffered audio may continue; Radio 63 will reconnect automatically.',addStations:'Add stations',findLive:'Find live stations',liveHelp:'Search the live directory for more stations in the selected country, then add the ones you want to Radio 63.',directoryPlaceholder:'Search live stations…',find:'Search',popular:'Popular live stations',add:'Add',added:'Added',removeFav:'Remove favourite',addFav:'Add favourite',addedToast:'Station added to Radio 63.',searchError:'Could not search the live station directory.',countries:{LV:'Latvia',GB:'United Kingdom',UA:'Ukraine',US:'USA',CA:'Canada',AU:'Australia'}},
+    lv:{go:'Atvērt GO 63 Navigator',title:'Tavs radio ceļam',intro:'Klausies populāras Latvijas, Lielbritānijas, Ukrainas, ASV, Kanādas un Austrālijas radio stacijas. Pievieno iecienītās stacijas un turpini klausīties ar izslēgtu ekrānu, ja ierīce atbalsta fona atskaņošanu.',browse:'Skatīt stacijas',favourites:'Iecienītās',search:'Meklēt stacijas',loading:'Ielādē stacijas…',none:'Stacijas nav atrastas.',noFav:'Šajā valstī vēl nav iecienīto staciju. Nospied ☆ pie stacijas, lai to pievienotu.',offline:'Nav interneta. Buferētā skaņa var turpināties; Radio 63 automātiski pieslēgsies atkārtoti.',addStations:'Pievienot stacijas',findLive:'Meklēt tiešraides stacijas',liveHelp:'Meklē dzīvajā radio katalogā papildu stacijas izvēlētajai valstij un pievieno tās Radio 63.',directoryPlaceholder:'Meklēt tiešraides stacijas…',find:'Meklēt',popular:'Populāras tiešraides stacijas',add:'Pievienot',added:'Pievienota',removeFav:'Noņemt no iecienītajām',addFav:'Pievienot iecienītajām',addedToast:'Stacija pievienota Radio 63.',searchError:'Neizdevās meklēt tiešraides radio katalogā.',countries:{LV:'Latvija',GB:'Lielbritānija',UA:'Ukraina',US:'ASV',CA:'Kanāda',AU:'Austrālija'}},
+    ru:{go:'Открыть GO 63 Navigator',title:'Ваше радио в дороге',intro:'Слушайте популярные станции Латвии, Великобритании, Украины, США, Канады и Австралии. Добавляйте избранное и продолжайте воспроизведение при выключенном экране, если устройство поддерживает фоновое аудио.',browse:'Станции',favourites:'Избранное',search:'Поиск станций',loading:'Загрузка станций…',none:'Станции не найдены.',noFav:'В этой стране пока нет избранных станций. Нажмите ☆, чтобы добавить станцию.',offline:'Нет интернета. Буфер может продолжить воспроизведение; Radio 63 переподключится автоматически.',addStations:'Добавить станции',findLive:'Найти станции в эфире',liveHelp:'Ищите дополнительные станции выбранной страны в онлайн-каталоге и добавляйте их в Radio 63.',directoryPlaceholder:'Поиск онлайн-станций…',find:'Искать',popular:'Популярные станции',add:'Добавить',added:'Добавлено',removeFav:'Удалить из избранного',addFav:'Добавить в избранное',addedToast:'Станция добавлена в Radio 63.',searchError:'Не удалось выполнить поиск в каталоге.',countries:{LV:'Латвия',GB:'Великобритания',UA:'Украина',US:'США',CA:'Канада',AU:'Австралия'}},
+    uk:{go:'Відкрити GO 63 Navigator',title:'Ваше радіо в дорозі',intro:'Слухайте популярні станції Латвії, Великої Британії, України, США, Канади та Австралії. Додавайте улюблені станції та слухайте з вимкненим екраном, якщо пристрій підтримує фонове аудіо.',browse:'Станції',favourites:'Улюблені',search:'Пошук станцій',loading:'Завантаження станцій…',none:'Станцій не знайдено.',noFav:'У цій країні ще немає улюблених станцій. Натисніть ☆, щоб додати.',offline:'Немає інтернету. Буфер може продовжити відтворення; Radio 63 перепідключиться автоматично.',addStations:'Додати станції',findLive:'Знайти онлайн-станції',liveHelp:'Шукайте додаткові станції вибраної країни в онлайн-каталозі та додавайте їх до Radio 63.',directoryPlaceholder:'Пошук онлайн-станцій…',find:'Пошук',popular:'Популярні онлайн-станції',add:'Додати',added:'Додано',removeFav:'Видалити з улюблених',addFav:'Додати в улюблені',addedToast:'Станцію додано до Radio 63.',searchError:'Не вдалося виконати пошук у каталозі.',countries:{LV:'Латвія',GB:'Велика Британія',UA:'Україна',US:'США',CA:'Канада',AU:'Австралія'}}
+  };
+  function radio63Text(lang,key){var d=RADIO63_TEXT[lang]||RADIO63_TEXT.en;return d[key]!==undefined?d[key]:RADIO63_TEXT.en[key];}
   function radio63Key(station) { return String(station && station.country || '') + '|' + String(station && station.id || ''); }
   function radio63ReadFavourites() {
     try { var value=JSON.parse(localStorage.getItem('radio63-favourites-v1')||'[]'); return Array.isArray(value)?value:[]; } catch (_) { return []; }
   }
-  function radio63CountryName(code) {
-    return {LV:'Latvia',GB:'United Kingdom',UA:'Ukraine',US:'USA',CA:'Canada',AU:'Australia'}[code]||code;
-  }
+  function radio63ReadAdded(){try{var value=JSON.parse(localStorage.getItem('radio63-added-stations-v1')||'[]');return Array.isArray(value)?value:[];}catch(_){return [];}}
+  function radio63WriteAdded(rows){localStorage.setItem('radio63-added-stations-v1',JSON.stringify(rows.slice(-250)));}
+  function radio63CountryName(code,lang) {var d=RADIO63_TEXT[lang]||RADIO63_TEXT.en;return (d.countries&&d.countries[code])||(RADIO63_TEXT.en.countries[code])||code;}
   function radio63Flag(code) { return {LV:'🇱🇻',GB:'🇬🇧',UA:'🇺🇦',US:'🇺🇸',CA:'🇨🇦',AU:'🇦🇺'}[code]||'📻'; }
 
   GoApp.prototype.isRadio63Favourite = function (station) { return radio63ReadFavourites().indexOf(radio63Key(station)) >= 0; };
@@ -4438,12 +4484,16 @@
     this.setState({radio63FavouriteVersion:Number(this.state.radio63FavouriteVersion||0)+1});
   };
   GoApp.prototype.radio63PlayableStations = function () {
-    var self=this,rows=this.state.radioStations||[],favourites=radio63ReadFavourites();
+    var rows=(this.state.radioStations||[]).slice(),favourites=radio63ReadFavourites(),country=this.state.radioCountry;
+    radio63ReadAdded().forEach(function(station){if(station&&station.country===country&&!rows.some(function(row){return radio63Key(row)===radio63Key(station);})){rows.push(station);}});
     if(this.state.radio63FavouritesOnly) rows=rows.filter(function(station){return favourites.indexOf(radio63Key(station))>=0;});
     var needle=String(this.state.radioSearch||'').trim().toLowerCase();
     if(needle) rows=rows.filter(function(station){return (String(station.name||'')+' '+String(station.tags||'')).toLowerCase().indexOf(needle)>=0;});
     return rows;
   };
+  GoApp.prototype.radio63IsAdded=function(station){return radio63ReadAdded().some(function(row){return radio63Key(row)===radio63Key(station);});};
+  GoApp.prototype.radio63AddStation=function(station){var rows=radio63ReadAdded();if(!rows.some(function(row){return radio63Key(row)===radio63Key(station);})){rows.push(station);radio63WriteAdded(rows);this.setState({radio63AddedVersion:Number(this.state.radio63AddedVersion||0)+1});this.showToast(radio63Text(this.state.lang,'addedToast'));}};
+  GoApp.prototype.radio63SearchDirectory=function(){var self=this,q=String(this.state.radio63DirectoryQuery||'').trim();this.setState({radio63DirectoryLoading:true,radio63DirectoryOpen:true});this.api('radio_search',{params:{country:this.state.radioCountry,q:q}}).then(function(data){self.setState({radio63DirectoryResults:data.stations||[],radio63DirectoryLoading:false});}).catch(function(){self.setState({radio63DirectoryLoading:false});self.showToast(radio63Text(self.state.lang,'searchError'),true);});};
   GoApp.prototype.radio63Skip = function (direction) {
     var rows=this.radio63PlayableStations();
     if(!rows.length)return;
@@ -4490,19 +4540,65 @@
   GoApp.prototype.loadReports=function(){};
   GoApp.prototype.handleSpotifyCallback=function(){};
 
+  /* Radio 63 1.2.6: replace inherited GO welcome page with a Radio-only home. */
+  GoApp.prototype.renderWelcome=function(){
+    var self=this,lang=this.state.lang||'en';
+    var copy={
+      en:{eyebrow:'RADIO 63',title:'Your radio for the road',text:'Listen to popular Latvian, British, Ukrainian, American, Canadian and Australian radio. Save favourite stations and keep listening with screen-off media controls where supported.',live:'Live radio',fav:'Favourite stations',background:'Background playback',open:'Open Radio 63',go:'Open GO 63 Navigator',goText:'Need navigation? Open the separate GO 63 Navigator app.',privacy:'Radio playback and favourites stay focused on listening. No navigation features are mixed into Radio 63.'},
+      lv:{eyebrow:'RADIO 63',title:'Tavs radio ceļam',text:'Klausies populāras Latvijas, Lielbritānijas, Ukrainas, ASV, Kanādas un Austrālijas radio stacijas. Saglabā iecienītās stacijas un turpini klausīties ar izslēgtu ekrānu, ja ierīce atbalsta fona atskaņošanu.',live:'Tiešraides radio',fav:'Iecienītās stacijas',background:'Fona atskaņošana',open:'Atvērt Radio 63',go:'Atvērt GO 63 Navigator',goText:'Vajag navigāciju? Atver atsevišķo GO 63 Navigator lietotni.',privacy:'Radio 63 ir paredzēts radio klausīšanai un iecienītajām stacijām. Navigācijas funkcijas šeit netiek jauktas klāt.'},
+      ru:{eyebrow:'RADIO 63',title:'Ваше радио в дороге',text:'Слушайте популярные станции Латвии, Великобритании, Украины, США, Канады и Австралии. Сохраняйте избранное и продолжайте воспроизведение при выключенном экране, если устройство поддерживает фоновое аудио.',live:'Прямой эфир',fav:'Избранные станции',background:'Фоновое воспроизведение',open:'Открыть Radio 63',go:'Открыть GO 63 Navigator',goText:'Нужна навигация? Откройте отдельное приложение GO 63 Navigator.',privacy:'Radio 63 предназначен для радио и избранных станций. Навигация находится в отдельном приложении GO 63.'},
+      uk:{eyebrow:'RADIO 63',title:'Ваше радіо в дорозі',text:'Слухайте популярні станції Латвії, Великої Британії, України, США, Канади та Австралії. Зберігайте улюблені станції та продовжуйте відтворення з вимкненим екраном, якщо пристрій підтримує фонове аудіо.',live:'Онлайн-радіо',fav:'Улюблені станції',background:'Фонове відтворення',open:'Відкрити Radio 63',go:'Відкрити GO 63 Navigator',goText:'Потрібна навігація? Відкрийте окремий застосунок GO 63 Navigator.',privacy:'Radio 63 призначений для радіо та улюблених станцій. Навігація знаходиться в окремому GO 63.'}
+    };
+    var c=copy[lang]||copy.en;
+    return h('main',{className:'welcome-shell radio63-welcome-shell'},
+      h('section',{className:'welcome-card radio63-welcome-card'},
+        h('a',{className:'admin-login-button',href:'?=admin',title:this.t('adminLogin'),'aria-label':this.t('adminLogin')},h(AppIcon,{name:'admin',size:20})),
+        h('header',{className:'radio63-welcome-brandbar'},
+          h('img',{src:'assets/radio63-logo.svg',alt:'Radio 63'}),
+          h('a',{className:'radio63-welcome-go',href:'https://go.63.lv/',target:'_self',rel:'noopener'},h('img',{src:'assets/go63-logo.svg',alt:''}),h('span',null,c.go))
+        ),
+        h('section',{className:'radio63-welcome-hero'},
+          h('div',{className:'radio63-welcome-copy'},
+            h('span',{className:'eyebrow'},c.eyebrow),
+            h('h1',null,c.title),
+            h('p',null,c.text),
+            h('div',{className:'feature-pills radio63-welcome-features'},
+              h('span',null,'◉ ',c.live),
+              h('span',null,'★ ',c.fav),
+              h('span',null,'♫ ',c.background)
+            ),
+            h('div',{className:'radio63-welcome-actions'},
+              h('button',{type:'button',className:'btn primary',onClick:function(){self.unlockOrientation();self.setState({entered:true,view:'radio'});}},c.open),
+              h('a',{className:'btn secondary',href:'https://go.63.lv/',target:'_self',rel:'noopener'},c.go)
+            )
+          ),
+          h('div',{className:'radio63-welcome-visual','aria-hidden':'true'},h('img',{src:'assets/radio63-icon.svg',alt:''}),h('strong',null,'Radio 63'),h('span',null,'LV · GB · UA · US · CA · AU'))
+        ),
+        h(LanguageSwitch,{value:this.state.lang,onChange:this.setLanguage,t:this.t.bind(this)}),
+        h('a',{className:'radio63-welcome-crosslink',href:'https://go.63.lv/',target:'_self',rel:'noopener'},
+          h('div',null,h('strong',null,c.go),h('span',null,c.goText)),h('img',{src:'assets/go63-logo.svg',alt:'GO 63 Navigator'})
+        ),
+        h('section',{className:'trust-panel radio63-welcome-trust'},h('div',{className:'trust-panel-title'},h('strong',null,'Radio 63'),h('span',null,'RADIO ONLY')),h('p',null,c.privacy)),
+        h('div',{className:'welcome-actions'},h('button',{type:'button',className:'btn ghost',onClick:function(){self.setState({modal:'auth',authMode:'login'});}},this.t('signIn')),h('button',{type:'button',className:'btn ghost',onClick:function(){self.setState({modal:'auth',authMode:'register'});}},this.t('createAccount'))),
+        !this.state.installed?h(InstallPlatforms,{onInstall:this.installApp,t:this.t.bind(this)}):null,
+        h('div',{className:'welcome-footer-actions'},h('button',{type:'button',className:'support-link',onClick:function(){self.setState({modal:'feedback'});}},this.t('contactUs')+' · '+this.t('feedback')),this.state.app.newsletter&&this.state.app.newsletter.enabled?h('button',{type:'button',className:'support-link newsletter-link',onClick:function(){self.setState({modal:'newsletter'});}},this.t('subscribeNews')):null)
+      )
+    );
+  };
+
   GoApp.prototype.renderRadioCountryTabs=function(){
-    var self=this;
-    return h('div',{className:'radio-country-tabs radio63-country-tabs'},RADIO_COUNTRIES.map(function(code){return h('button',{type:'button',key:code,className:self.state.radioCountry===code?'active':'',onClick:function(){self.loadRadioStations(code);}},h('span',{className:'country-flag'},radio63Flag(code)),h('span',null,radio63CountryName(code)));}));
+    var self=this,lang=this.state.lang||'en';
+    return h('div',{className:'radio-country-tabs radio63-country-tabs'},RADIO_COUNTRIES.map(function(code){return h('button',{type:'button',key:code,className:self.state.radioCountry===code?'active':'',onClick:function(){self.loadRadioStations(code);}},h('span',{className:'country-flag'},radio63Flag(code)),h('span',null,radio63CountryName(code,lang)));}));
   };
   GoApp.prototype.renderRadioView=function(){
-    var self=this;
+    var self=this,lang=this.state.lang||'en';
     var stations=this.radio63PlayableStations();
     var favCount=radio63ReadFavourites().length;
     var stationContent;
     if(this.state.radioLoading){
-      stationContent=h('div',{className:'empty-state'},h('div',{className:'spinner'}),'Loading stations…');
+      stationContent=h('div',{className:'empty-state'},h('div',{className:'spinner'}),radio63Text(lang,'loading'));
     }else if(!stations.length){
-      stationContent=h('div',{className:'empty-state'},this.state.radio63FavouritesOnly?'No favourites in this country yet. Tap ☆ beside a station to add it.':'No stations found.');
+      stationContent=h('div',{className:'empty-state'},this.state.radio63FavouritesOnly?radio63Text(lang,'noFav'):radio63Text(lang,'none'));
     }else{
       stationContent=stations.map(function(station){
         var current=!!(self.state.player.station&&self.state.player.station.id===station.id&&self.state.player.station.country===station.country);
@@ -4510,48 +4606,41 @@
         return h('div',{className:'station-card radio63-station'+(current&&self.isPlayerActive()?' playing':''),key:radio63Key(station)},
           h('button',{type:'button',className:'radio63-station-play',onClick:function(){self.playStation(station);}},
             h(StationLogo,{station:station}),
-            h('span',{className:'radio63-station-copy'},
-              h('h3',null,station.name),
-              h('p',null,[station.codec,station.bitrate?station.bitrate+' kbps':'',station.tags].filter(Boolean).join(' · '))
-            ),
+            h('span',{className:'radio63-station-copy'},h('h3',null,station.name),h('p',null,[station.codec,station.bitrate?station.bitrate+' kbps':'',station.tags].filter(Boolean).join(' · '))),
             h('span',{className:'play-circle'},h(AppIcon,{name:current&&self.isPlayerActive()?'pause':'play',size:20}))
           ),
-          h('button',{type:'button',className:'radio63-favourite'+(favourite?' active':''),'aria-label':favourite?'Remove favourite':'Add favourite',title:favourite?'Remove favourite':'Add favourite',onClick:function(){self.toggleRadio63Favourite(station);}},favourite?'★':'☆')
+          h('button',{type:'button',className:'radio63-favourite'+(favourite?' active':''),'aria-label':favourite?radio63Text(lang,'removeFav'):radio63Text(lang,'addFav'),title:favourite?radio63Text(lang,'removeFav'):radio63Text(lang,'addFav'),onClick:function(){self.toggleRadio63Favourite(station);}},favourite?'★':'☆')
         );
       });
     }
+    var directoryResults=this.state.radio63DirectoryResults||[];
+    var directoryPanel=this.state.radio63DirectoryOpen?h('section',{className:'radio63-directory panel'},
+      h('div',{className:'radio63-directory-head'},h('div',null,h('strong',null,radio63Text(lang,'findLive')),h('p',null,radio63Text(lang,'liveHelp'))),h('button',{type:'button',className:'icon-btn small',onClick:function(){self.setState({radio63DirectoryOpen:false});}},'×')),
+      h('form',{className:'radio63-directory-search',onSubmit:function(e){e.preventDefault();self.radio63SearchDirectory();}},
+        h('div',{className:'search-box'},h(AppIcon,{name:'search',size:18}),h('input',{value:this.state.radio63DirectoryQuery||'',onChange:function(e){self.setState({radio63DirectoryQuery:e.target.value});},placeholder:radio63Text(lang,'directoryPlaceholder')})),
+        h('button',{type:'submit',className:'btn primary small'},radio63Text(lang,'find'))
+      ),
+      this.state.radio63DirectoryLoading?h('div',{className:'empty-state'},h('div',{className:'spinner'}),radio63Text(lang,'loading')):
+      directoryResults.length?h('div',{className:'radio63-directory-results'},directoryResults.map(function(station){var added=self.radio63IsAdded(station);return h('div',{className:'radio63-directory-row',key:'dir-'+radio63Key(station)},h(StationLogo,{station:station}),h('div',{className:'radio63-directory-copy'},h('strong',null,station.name),h('span',null,[station.codec,station.bitrate?station.bitrate+' kbps':'',station.tags].filter(Boolean).join(' · '))),h('button',{type:'button',className:'btn '+(added?'secondary':'primary')+' small',disabled:added,onClick:function(){self.radio63AddStation(station);}},added?radio63Text(lang,'added'):radio63Text(lang,'add')));})):null
+    ):null;
     return h('section',{className:'app-view page-view radio63-view'},
       h('div',{className:'radio63-brandbar'},
         h('img',{src:'assets/radio63-logo.svg',alt:'Radio 63'}),
-        h('a',{className:'radio63-go-link',href:'https://go.63.lv/',target:'_self',rel:'noopener'},
-          h('img',{src:'assets/go63-logo.svg',alt:''}),h('span',null,'Open GO 63 Navigator'))
+        h('a',{className:'radio63-go-link',href:'https://go.63.lv/',target:'_self',rel:'noopener'},h('img',{src:'assets/go63-logo.svg',alt:''}),h('span',null,radio63Text(lang,'go')))
       ),
       h('header',{className:'radio63-home'},
-        h('div',{className:'radio63-home-copy'},
-          h('span',{className:'eyebrow'},'RADIO 63'),
-          h('h1',null,'Your radio for the road'),
-          h('p',null,'Listen to popular Latvian, British, Ukrainian, American, Canadian and Australian stations. Add favourites for one-tap access and keep playback running with the screen off where your device supports background media.'),
-          h('div',{className:'radio63-home-actions'},
-            h('a',{className:'btn primary',href:'#stations'},'Browse stations'),
-            h('a',{className:'btn secondary',href:'https://go.63.lv/',target:'_self',rel:'noopener'},'Open GO 63 Navigator')
-          )
-        ),
+        h('div',{className:'radio63-home-copy'},h('span',{className:'eyebrow'},'RADIO 63'),h('h1',null,radio63Text(lang,'title')),h('p',null,radio63Text(lang,'intro')),h('div',{className:'radio63-home-actions'},h('a',{className:'btn primary',href:'#stations'},radio63Text(lang,'browse')),h('a',{className:'btn secondary',href:'https://go.63.lv/',target:'_self',rel:'noopener'},radio63Text(lang,'go')))),
         h('div',{className:'radio63-home-badge','aria-hidden':'true'},'📻')
       ),
       h('div',{id:'stations',className:'radio63-stations-anchor'}),
       this.renderRadioCountryTabs(),
       h('div',{className:'radio63-toolbar'},
-        h('button',{type:'button',className:'btn '+(this.state.radio63FavouritesOnly?'primary':'secondary'),onClick:function(){
-          var next=!self.state.radio63FavouritesOnly;
-          localStorage.setItem('radio63-favourites-only',next?'1':'0');
-          self.setState({radio63FavouritesOnly:next});
-        }},'★ Favourites',favCount?' ('+favCount+')':''),
-        h('div',{className:'search-box radio63-search'},
-          h(AppIcon,{name:'search',size:18}),
-          h('input',{value:this.state.radioSearch,onChange:function(e){self.setState({radioSearch:e.target.value});},placeholder:'Search stations'})
-        )
+        h('button',{type:'button',className:'btn '+(this.state.radio63FavouritesOnly?'primary':'secondary'),onClick:function(){var next=!self.state.radio63FavouritesOnly;localStorage.setItem('radio63-favourites-only',next?'1':'0');self.setState({radio63FavouritesOnly:next});}},'★ '+radio63Text(lang,'favourites'),favCount?' ('+favCount+')':''),
+        h('div',{className:'search-box radio63-search'},h(AppIcon,{name:'search',size:18}),h('input',{value:this.state.radioSearch,onChange:function(e){self.setState({radioSearch:e.target.value});},placeholder:radio63Text(lang,'search')})),
+        h('button',{type:'button',className:'btn secondary radio63-add-stations',onClick:function(){var open=!self.state.radio63DirectoryOpen;self.setState({radio63DirectoryOpen:open});if(open&&!(self.state.radio63DirectoryResults||[]).length)self.radio63SearchDirectory();}},'+ '+radio63Text(lang,'addStations'))
       ),
-      !this.state.online?h('div',{className:'radio63-offline-note'},'No internet. Current buffered audio may continue; Radio 63 will reconnect automatically.'):null,
+      directoryPanel,
+      !this.state.online?h('div',{className:'radio63-offline-note'},radio63Text(lang,'offline')):null,
       h('div',{className:'station-list radio63-stations'},stationContent)
     );
   };

@@ -66,7 +66,7 @@ try {
     }
     // Public read-only provider requests do not need an open PHP session. Closing
     // it here prevents slow map/weather calls from blocking the user's next API call.
-    if ($method === 'GET' && in_array($action, ['geocode', 'route', 'weather', 'road_intelligence', 'nearby', 'reports', 'radio_stations'], true) && session_status() === PHP_SESSION_ACTIVE) {
+    if ($method === 'GET' && in_array($action, ['geocode', 'route', 'weather', 'road_intelligence', 'nearby', 'reports', 'radio_stations', 'radio_search'], true) && session_status() === PHP_SESSION_ACTIVE) {
         session_write_close();
     }
 
@@ -1362,6 +1362,16 @@ try {
             $stations = go_attach_radio_relays($stations, $country);
             go_json_response(['ok' => true, 'country' => $country, 'stations' => $stations, 'source' => $source, 'cachedAt' => $cachedAt]);
 
+        case 'radio_search':
+            $country = strtoupper(go_clean_text($_GET['country'] ?? 'GB', 2));
+            $query = go_clean_text($_GET['q'] ?? '', 80);
+            if (!in_array($country, ['LV', 'GB', 'UA', 'US', 'CA', 'AU'], true)) {
+                throw new InvalidArgumentException('Unsupported radio country.');
+            }
+            $stations = go_radio_search_live($country, $query);
+            $stations = go_attach_radio_relays($stations, $country);
+            go_json_response(['ok' => true, 'country' => $country, 'query' => $query, 'stations' => $stations]);
+
         case 'radio_stream':
             if ($method !== 'GET') {
                 go_json_response(['ok' => false, 'message' => 'Method not allowed.'], 405);
@@ -1441,6 +1451,24 @@ function go_find_radio_station(string $country, string $stationId): array
     foreach ($stations as $station) {
         if (is_array($station) && hash_equals((string)($station['id'] ?? ''), $stationId)) {
             return $station;
+        }
+    }
+    // Stations added from live directory search may not be in the top cached list.
+    // Resolve those directly by Radio Browser UUID so relay playback still works.
+    $config = (array)(go_config()['radio'] ?? []);
+    $servers = array_values(array_filter((array)($config['servers'] ?? []), 'is_string'));
+    foreach ($servers as $server) {
+        try {
+            $url = rtrim($server, '/') . '/json/stations/byuuid/' . rawurlencode($stationId);
+            $rows = go_http_get_json($url, ['User-Agent: Radio63/' . GO_APP_VERSION], 6);
+            $found = go_normalize_radio_rows($rows, $country, []);
+            foreach ($found as $station) {
+                if ((string)($station['id'] ?? '') === $stationId) {
+                    return $station;
+                }
+            }
+        } catch (Throwable) {
+            continue;
         }
     }
     throw new InvalidArgumentException('Radio station not found. Refresh the station list and try again.');
@@ -1631,6 +1659,36 @@ function go_distance_meters(float $lat1, float $lon1, float $lat2, float $lon2):
     return $radius * 2 * atan2(sqrt($a), sqrt(1 - $a));
 }
 
+function go_radio_search_live(string $country, string $query = ''): array
+{
+    $config = (array)(go_config()['radio'] ?? []);
+    $servers = array_values(array_filter((array)($config['servers'] ?? []), 'is_string'));
+    shuffle($servers);
+    foreach ($servers as $server) {
+        try {
+            $params = [
+                'countrycode' => $country,
+                'hidebroken' => 'true',
+                'order' => 'clickcount',
+                'reverse' => 'true',
+                'limit' => '60',
+            ];
+            if ($query !== '') {
+                $params['name'] = $query;
+            }
+            $url = rtrim($server, '/') . '/json/stations/search?' . http_build_query($params);
+            $rows = go_http_get_json($url, ['User-Agent: Radio63/' . GO_APP_VERSION], 7);
+            $stations = go_normalize_radio_rows($rows, $country, []);
+            if ($stations) {
+                return array_slice($stations, 0, 50);
+            }
+        } catch (Throwable) {
+            continue;
+        }
+    }
+    return [];
+}
+
 function go_radio_stations(string $country): array
 {
     $config = (array)(go_config()['radio'] ?? []);
@@ -1642,13 +1700,11 @@ function go_radio_stations(string $country): array
     $refreshFailedAt = (string)($cached['refreshFailedAt'] ?? '');
     $builtIn = go_builtin_stations($country);
     if ($cacheVersion !== GO_APP_VERSION && is_array($cached['stations'] ?? null) && $cached['stations']) {
-        $cachedAt = date(DATE_ATOM);
-        $cached['appVersion'] = GO_APP_VERSION;
-        $cached['cachedAt'] = $cachedAt;
-        $cached['refreshFailedAt'] = null;
+        // App upgrades should refresh the directory instead of pinning old radio URLs.
+        // Keep the old stations only as a fallback if every live directory server fails.
         $cached['stations'] = go_merge_builtin_stations($cached['stations'], $builtIn);
-        go_write_json($cachePath, $cached);
-        return [$cached['stations'], 'cache', $cachedAt];
+        $cached['refreshFailedAt'] = null;
+        $cachedAt = '';
     }
     if ($cacheVersion === GO_APP_VERSION && $cachedAt !== '' && strtotime($cachedAt) >= time() - $ttl && is_array($cached['stations'] ?? null)) {
         $stations = go_merge_builtin_stations($cached['stations'], $builtIn);
@@ -1772,6 +1828,7 @@ function go_normalize_radio_rows(array $rows, string $country, array $builtIn): 
                 'homepage' => filter_var($row['homepage'] ?? '', FILTER_VALIDATE_URL) ? (string)$row['homepage'] : '',
                 'urls' => $urls,
                 'featured' => false,
+                'hls' => (int)($row['hls'] ?? 0) === 1,
             ];
         } else {
             if (empty($groups[$key]['lockUrls'])) {
@@ -1793,18 +1850,30 @@ function go_normalize_radio_rows(array $rows, string $country, array $builtIn): 
 function go_station_key(string $name): string
 {
     $name = function_exists('mb_strtolower') ? mb_strtolower($name) : strtolower($name);
-    return preg_replace('/[^a-z0-9а-яёāčēģīķļņšūž]+/u', '', $name) ?: md5($name);
+    $name = str_replace(['pieci.lv', 'pieci lv', ' - ', '–', '—'], ['pieci', 'pieci', ' ', ' ', ' '], $name);
+    $key = preg_replace('/[^a-z0-9а-яёāčēģīķļņšūž]+/u', '', $name) ?: md5($name);
+    // Known public-radio aliases used by different station directories.
+    $aliases = [
+        'latvijasradio3klasika' => 'latvijasradio3klasika',
+        'latvijasradio3klasikafm' => 'latvijasradio3klasika',
+        'latvijasradio5pieci' => 'latvijasradio5pieci',
+        'latvijasradio5piecifm' => 'latvijasradio5pieci',
+        'pieci' => 'latvijasradio5pieci',
+        'piecifm' => 'latvijasradio5pieci',
+    ];
+    return $aliases[$key] ?? $key;
 }
 
 function go_builtin_stations(string $country): array
 {
     if ($country === 'LV') {
         return [
-            ['id' => 'lv-lr1', 'name' => 'Latvijas Radio 1', 'country' => 'LV', 'favicon' => '', 'tags' => 'news,talk,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr1.lsm.lv/', 'urls' => ['http://lr1mp1.latvijasradio.lv:8012/stream.mp3', 'http://lr1mp1.latvijasradio.lv:8012/'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
-            ['id' => 'lv-lr2', 'name' => 'Latvijas Radio 2', 'country' => 'LV', 'favicon' => '', 'tags' => 'latvian,music,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr2.lsm.lv/', 'urls' => ['http://lr2mp1.latvijasradio.lv:8002/stream.mp3', 'http://lr2mp1.latvijasradio.lv:8002/'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
-            ['id' => 'lv-lr3', 'name' => 'Latvijas Radio 3 Klasika', 'country' => 'LV', 'favicon' => '', 'tags' => 'classical,culture,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://klasika.lsm.lv/', 'urls' => ['http://lr3mp0.latvijasradio.lv:8004/stream.mp3', 'http://lr3mp0.latvijasradio.lv:8004/'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
-            ['id' => 'lv-lr4', 'name' => 'Latvijas Radio 4', 'country' => 'LV', 'favicon' => '', 'tags' => 'russian,news,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr4.lsm.lv/', 'urls' => ['http://lr4mp1.latvijasradio.lv:8020/stream.mp3', 'http://lr4mp1.latvijasradio.lv:8020/'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
-            ['id' => 'lv-pieci', 'name' => 'Latvijas Radio 5 Pieci', 'country' => 'LV', 'favicon' => '', 'tags' => 'hits,youth,public', 'codec' => 'MP3', 'bitrate' => 192, 'homepage' => 'https://pieci.lsm.lv/', 'urls' => ['https://live.pieci.lv/live19-hq.mp3', 'http://live.pieci.lv:8000/live19-hq.mp3'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
+            ['id' => 'lv-lr1', 'name' => 'Latvijas Radio 1', 'country' => 'LV', 'favicon' => '', 'tags' => 'news,talk,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr1.lsm.lv/', 'urls' => ['http://lr1mp1.latvijasradio.lv:8010/', 'http://lr1mp0.latvijasradio.lv:8010/', 'https://5a44e5b800a41.streamlock.net/liveVLR1/mp4:LR1/playlist.m3u8'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+            ['id' => 'lv-lr2', 'name' => 'Latvijas Radio 2', 'country' => 'LV', 'favicon' => '', 'tags' => 'latvian,music,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr2.lsm.lv/', 'urls' => ['http://lr2mp1.latvijasradio.lv:8000/', 'http://lr2mp1.latvijasradio.lv:8002/', 'https://muste.latvijasradio.lv/shoutcast/mp4:lr2a.stream/playlist.m3u8', 'https://5a44e5b800a41.streamlock.net/liveVLR2/mp4:LR2/playlist.m3u8'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+            ['id' => 'lv-lr3', 'name' => 'Latvijas Radio 3 Klasika', 'country' => 'LV', 'favicon' => '', 'tags' => 'classical,culture,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://klasika.lsm.lv/', 'urls' => ['http://lr3mp0.latvijasradio.lv:8004/', 'https://5a44e5b800a41.streamlock.net/liveVLR3/mp4:Klasika/playlist.m3u8'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+            ['id' => 'lv-lr4', 'name' => 'Latvijas Radio 4', 'country' => 'LV', 'favicon' => '', 'tags' => 'russian,news,public', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lr4.lsm.lv/', 'urls' => ['http://lr4mp0.latvijasradio.lv:8018/', 'http://lr4mp1.latvijasradio.lv:8018/', 'https://5a44e5b800a41.streamlock.net/shoutcast/mp4:lr4a.stream/playlist.m3u8'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+            ['id' => 'lv-pieci', 'name' => 'Latvijas Radio 5 Pieci', 'country' => 'LV', 'favicon' => '', 'tags' => 'hits,youth,public', 'codec' => 'MP3', 'bitrate' => 192, 'homepage' => 'https://pieci.lsm.lv/', 'urls' => ['http://live.pieci.lv/live19-hq.mp3', 'http://live.pieci.lv:8000/live19-hq.mp3', 'https://live.pieci.lv/live19-hq.mp3', 'http://live.pieci.lv/live19-hq.aac'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+            ['id' => 'lv-lkr', 'name' => 'Latvijas Kristīgais Radio', 'country' => 'LV', 'favicon' => '', 'tags' => 'christian,religious,talk,latvian', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://lkr.lv/', 'urls' => ['https://radio.lkr.lv/listen.pls', 'http://91.203.71.10:8006/listen.pls', 'http://91.203.71.10:8006/'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
             ['id' => 'lv-swh', 'name' => 'Radio SWH', 'country' => 'LV', 'favicon' => '', 'tags' => 'music,talk', 'codec' => 'MP3', 'bitrate' => 192, 'homepage' => 'https://radioswh.lv/', 'urls' => ['https://live.radioswh.lv:8443/swhmp3', 'https://stream.radioswh.lv:8443/swhmp3', 'http://80.232.162.149:8000/swh96mp3'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
             ['id' => 'lv-ehr', 'name' => 'European Hit Radio', 'country' => 'LV', 'favicon' => '', 'tags' => 'hits,dance', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.ehrhiti.lv/', 'urls' => ['http://stream.ehrhiti.lv:8000/ehr.mp3', 'http://stream.europeanhitradio.com:8000/ehr64'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
             ['id' => 'lv-skonto', 'name' => 'Radio Skonto', 'country' => 'LV', 'favicon' => '', 'tags' => 'pop,news,talk,latvian', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://radioskonto.lv/', 'urls' => ['https://stream.rcast.net/236428', 'http://stream.radioskonto.lv:8002/stereo', 'http://skonto.datucentrs.eu/mp3'], 'featured' => true, 'lockUrls' => true, 'relayFollowRedirects' => true],
@@ -1822,6 +1891,16 @@ function go_builtin_stations(string $country): array
     }
     if ($country === 'GB') {
         return [
+        ['id' => 'gb-bbc-r1', 'name' => 'BBC Radio 1', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,pop,rock,hits', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_one', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_one'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-r2', 'name' => 'BBC Radio 2', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,pop,talk', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_two', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_two'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-r3', 'name' => 'BBC Radio 3', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,classical,culture', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_three', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_three'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-r4', 'name' => 'BBC Radio 4', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,news,talk', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_fourfm', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-r4x', 'name' => 'BBC Radio 4 Extra', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,comedy,drama,talk', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_four_extra', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_four_extra'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-r5', 'name' => 'BBC Radio 5 Live', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,news,sport,talk', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_five_live', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_radio_five_live_online_nonuk', 'http://stream.live.vc.bbcmedia.co.uk/bbc_radio_five_live'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-6music', 'name' => 'BBC Radio 6 Music', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,alternative,music', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_6music', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_6music'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-asian', 'name' => 'BBC Asian Network', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,asian,music,talk', 'codec' => 'AAC', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_asian_network', 'urls' => ['http://stream.live.vc.bbcmedia.co.uk/bbc_asian_network'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-bbc-northampton', 'name' => 'BBC Radio Northampton', 'country' => 'GB', 'favicon' => '', 'tags' => 'bbc,local,northampton,northamptonshire,news,talk', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.bbc.co.uk/sounds/play/live:bbc_radio_northampton', 'urls' => ['https://stream.live.vc.bbcmedia.co.uk/bbc_radio_northampton'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
+        ['id' => 'gb-heart-peterborough', 'name' => 'Heart Peterborough', 'country' => 'GB', 'favicon' => '', 'tags' => 'peterborough,pop,local', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.heart.co.uk/peterborough/', 'urls' => ['http://media-ice.musicradio.com/HeartPeterboroughMP3.m3u', 'https://media-ice.musicradio.com/HeartUKMP3'], 'featured' => true, 'lockUrls' => false, 'relayFollowRedirects' => true],
         ['id' => 'gb-heart', 'name' => 'Heart UK', 'country' => 'GB', 'favicon' => '', 'tags' => 'pop,hits', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.heart.co.uk/', 'urls' => ['https://media-ice.musicradio.com/HeartUKMP3'], 'featured' => true, 'lockUrls' => true],
         ['id' => 'gb-capital', 'name' => 'Capital UK', 'country' => 'GB', 'favicon' => '', 'tags' => 'pop,hits', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.capitalfm.com/', 'urls' => ['https://media-ice.musicradio.com/CapitalUKMP3'], 'featured' => true, 'lockUrls' => true],
         ['id' => 'gb-classic', 'name' => 'Classic FM', 'country' => 'GB', 'favicon' => '', 'tags' => 'classical', 'codec' => 'MP3', 'bitrate' => 128, 'homepage' => 'https://www.classicfm.com/', 'urls' => ['https://media-ice.musicradio.com/ClassicFMMP3'], 'featured' => true, 'lockUrls' => true],

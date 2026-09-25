@@ -53,6 +53,7 @@ $captchaEnabled = (bool)($publicSettings['hcaptcha']['enabled'] ?? false);
 <?php if ($captchaEnabled): ?>
     <script src="https://js.hcaptcha.com/1/api.js?render=explicit&recaptchacompat=off" async defer></script>
 <?php endif; ?>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.16/dist/hls.min.js" defer></script>
     <script src="assets/app.js?v=<?= rawurlencode(GO_APP_VERSION) ?>" defer></script>
 <?php endif; ?>
 </body>
