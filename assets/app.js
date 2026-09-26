@@ -4676,6 +4676,202 @@
   };
 
 
+
+
+  /* Radio 63 1.3.4: resilient stream playback + on-device backup music.
+     Selected audio is stored in IndexedDB when the browser allows it. It is
+     never uploaded to the Radio 63 server. */
+  var RADIO63_LOCAL_DB = 'radio63-local-audio-v1';
+  var RADIO63_LOCAL_STORE = 'tracks';
+  var RADIO63_LOCAL_LIMIT = 30;
+  var RADIO63_LOCAL_TEXT = {
+    en:{title:'Backup music',desc:'Choose MP3/audio files from this device. Radio 63 can play them at random if a stream drops or the internet goes offline.',choose:'Choose audio files',auto:'Automatic fallback',autoHelp:'Use random local music when live radio cannot continue.',random:'Random local (ad break)',returnRadio:'Return to live radio',clear:'Clear saved audio',saved:'saved on this device',none:'No local audio selected yet.',fallbackOffline:'Offline backup',fallbackStream:'Stream backup',fallbackManual:'Local music',savedToast:'Local backup music saved on this device.',clearedToast:'Saved local audio cleared.',saveError:'The files can be used now, but this browser could not save all of them for later.',adNote:'Live radio adverts are not exposed reliably by every stream. Use “Random local (ad break)” when you want to skip an advert manually.'},
+    lv:{title:'Rezerves mūzika',desc:'Izvēlies MP3/audio failus no šīs ierīces. Ja radio straume apstājas vai pazūd internets, Radio 63 var nejauši atskaņot vietējo mūziku.',choose:'Izvēlēties audio failus',auto:'Automātiska rezerve',autoHelp:'Ja tiešraides radio nevar turpināties, atskaņot nejaušu vietējo mūziku.',random:'Nejauša dziesma (reklāmas pauze)',returnRadio:'Atgriezties tiešraidē',clear:'Notīrīt saglabāto audio',saved:'saglabāti šajā ierīcē',none:'Vietējie audio faili vēl nav izvēlēti.',fallbackOffline:'Bezsaistes rezerve',fallbackStream:'Straumes rezerve',fallbackManual:'Vietējā mūzika',savedToast:'Rezerves mūzika saglabāta šajā ierīcē.',clearedToast:'Saglabātais vietējais audio notīrīts.',saveError:'Failus var izmantot tagad, bet pārlūks nevarēja visus saglabāt vēlākai lietošanai.',adNote:'Tiešraides radio reklāmas ne visas straumes ļauj droši noteikt. Izmanto “Nejauša dziesma (reklāmas pauze)”, ja reklāmas laikā vēlies ieslēgt savu mūziku.'},
+    ru:{title:'Резервная музыка',desc:'Выберите MP3/аудиофайлы на этом устройстве. Если поток радио остановится или пропадёт интернет, Radio 63 сможет случайно включать локальную музыку.',choose:'Выбрать аудиофайлы',auto:'Автоматический резерв',autoHelp:'Включать случайную локальную музыку, если эфир не может продолжаться.',random:'Случайный трек (реклама)',returnRadio:'Вернуться к эфиру',clear:'Очистить сохранённые аудио',saved:'сохранено на устройстве',none:'Локальные аудиофайлы ещё не выбраны.',fallbackOffline:'Резерв без интернета',fallbackStream:'Резерв потока',fallbackManual:'Локальная музыка',savedToast:'Резервная музыка сохранена на этом устройстве.',clearedToast:'Сохранённые локальные аудио удалены.',saveError:'Файлы можно использовать сейчас, но браузеру не удалось сохранить все из них на будущее.',adNote:'Рекламу в прямом эфире нельзя надёжно определить во всех потоках. Используйте “Случайный трек (реклама)” вручную.'},
+    uk:{title:'Резервна музика',desc:'Виберіть MP3/аудіофайли на цьому пристрої. Якщо радіопотік зупиниться або зникне інтернет, Radio 63 зможе випадково відтворювати локальну музику.',choose:'Вибрати аудіофайли',auto:'Автоматичний резерв',autoHelp:'Вмикати випадкову локальну музику, якщо прямий ефір не може продовжуватися.',random:'Випадковий трек (реклама)',returnRadio:'Повернутися до ефіру',clear:'Очистити збережене аудіо',saved:'збережено на пристрої',none:'Локальні аудіофайли ще не вибрані.',fallbackOffline:'Резерв без інтернету',fallbackStream:'Резерв потоку',fallbackManual:'Локальна музика',savedToast:'Резервну музику збережено на цьому пристрої.',clearedToast:'Збережені локальні аудіо очищено.',saveError:'Файли можна використовувати зараз, але браузеру не вдалося зберегти всі з них для подальшого використання.',adNote:'Рекламу в прямому ефірі неможливо надійно визначити в кожному потоці. Використовуйте “Випадковий трек (реклама)” вручну.'}
+  };
+  function radio63LocalText(lang,key){var row=RADIO63_LOCAL_TEXT[lang]||RADIO63_LOCAL_TEXT.en;return row[key]!==undefined?row[key]:RADIO63_LOCAL_TEXT.en[key];}
+  function radio63LocalDbOpen(){
+    return new Promise(function(resolve,reject){
+      if(!window.indexedDB){reject(new Error('IndexedDB unavailable'));return;}
+      var request;
+      try{request=indexedDB.open(RADIO63_LOCAL_DB,1);}catch(error){reject(error);return;}
+      request.onupgradeneeded=function(){var db=request.result;if(!db.objectStoreNames.contains(RADIO63_LOCAL_STORE))db.createObjectStore(RADIO63_LOCAL_STORE,{keyPath:'id'});};
+      request.onsuccess=function(){resolve(request.result);};
+      request.onerror=function(){reject(request.error||new Error('IndexedDB open failed'));};
+    });
+  }
+  function radio63LocalLoad(){
+    return radio63LocalDbOpen().then(function(db){return new Promise(function(resolve,reject){
+      var rows=[],tx=db.transaction(RADIO63_LOCAL_STORE,'readonly'),store=tx.objectStore(RADIO63_LOCAL_STORE),request=store.openCursor();
+      request.onsuccess=function(){var cursor=request.result;if(cursor){rows.push(cursor.value);cursor.continue();}else resolve(rows);};
+      request.onerror=function(){reject(request.error||new Error('IndexedDB read failed'));};
+      tx.oncomplete=function(){try{db.close();}catch(_){}};
+      tx.onerror=function(){reject(tx.error||new Error('IndexedDB transaction failed'));};
+    });});
+  }
+  function radio63LocalSave(rows){
+    rows=(rows||[]).slice(-RADIO63_LOCAL_LIMIT);
+    return radio63LocalDbOpen().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(RADIO63_LOCAL_STORE,'readwrite'),store=tx.objectStore(RADIO63_LOCAL_STORE);
+      rows.forEach(function(row){store.put({id:row.id,name:row.name,type:row.type||'',size:row.size||0,lastModified:row.lastModified||0,blob:row.file||row.blob});});
+      tx.oncomplete=function(){try{db.close();}catch(_){}resolve();};
+      tx.onerror=function(){reject(tx.error||new Error('IndexedDB write failed'));};
+      tx.onabort=function(){reject(tx.error||new Error('IndexedDB write aborted'));};
+    });});
+  }
+  function radio63LocalClearDb(){
+    return radio63LocalDbOpen().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(RADIO63_LOCAL_STORE,'readwrite');tx.objectStore(RADIO63_LOCAL_STORE).clear();
+      tx.oncomplete=function(){try{db.close();}catch(_){}resolve();};tx.onerror=function(){reject(tx.error||new Error('IndexedDB clear failed'));};
+    });});
+  }
+  function radio63TrackId(file){return 'local-'+String(file.name||'audio').replace(/[^a-z0-9._-]+/gi,'-').slice(0,80)+'-'+Number(file.size||0)+'-'+Number(file.lastModified||0);}
+
+  GoApp.prototype.radio63LocalFallbackEnabled=function(){return localStorage.getItem('radio63-local-fallback-enabled')!=='0';};
+  GoApp.prototype.radio63SetLocalFallbackEnabled=function(enabled){localStorage.setItem('radio63-local-fallback-enabled',enabled?'1':'0');this.setState({radio63LocalVersion:Number(this.state.radio63LocalVersion||0)+1});};
+  GoApp.prototype.radio63HasLocalTracks=function(){return !!(this.state.localTracks&&this.state.localTracks.length);};
+  GoApp.prototype.radio63LoadLocalTracks=function(){var self=this;return radio63LocalLoad().then(function(rows){var tracks=(rows||[]).filter(function(row){return row&&row.blob;}).map(function(row){return {id:row.id,name:row.name||'Local audio',type:row.type||'',size:row.size||0,lastModified:row.lastModified||0,file:row.blob};});if(tracks.length)self.setState({localTracks:tracks.slice(-RADIO63_LOCAL_LIMIT)});}).catch(function(){});};
+
+  var radio63HandleLocalFiles133=GoApp.prototype.handleLocalFiles;
+  GoApp.prototype.handleLocalFiles=function(event){
+    var self=this,files=Array.prototype.slice.call(event&&event.target&&event.target.files||[]).filter(function(file){return String(file.type||'').indexOf('audio/')===0||/\.(mp3|m4a|aac|ogg|wav|flac|opus)$/i.test(String(file.name||''));});
+    if(event&&event.target)try{event.target.value='';}catch(_){}
+    if(!files.length)return;
+    var existing=(this.state.localTracks||[]).slice(),byId={};
+    existing.forEach(function(track){byId[track.id]=track;});
+    files.forEach(function(file){var row={id:radio63TrackId(file),name:String(file.name||'Local audio').replace(/\.[^.]+$/,''),type:file.type||'',size:file.size||0,lastModified:file.lastModified||0,file:file};byId[row.id]=row;});
+    var merged=Object.keys(byId).map(function(id){return byId[id];}).slice(-RADIO63_LOCAL_LIMIT);
+    this.setState({localTracks:merged,radio63LocalVersion:Number(this.state.radio63LocalVersion||0)+1});
+    radio63LocalSave(merged).then(function(){self.showToast(radio63LocalText(self.state.lang,'savedToast'));}).catch(function(){self.showToast(radio63LocalText(self.state.lang,'saveError'),true);});
+  };
+
+  GoApp.prototype.radio63PickRandomTrack=function(){
+    var rows=this.state.localTracks||[];if(!rows.length)return null;
+    var current=this.state.localTrackIndex,index=Math.floor(Math.random()*rows.length);
+    if(rows.length>1&&index===current)index=(index+1+Math.floor(Math.random()*(rows.length-1)))%rows.length;
+    return {track:rows[index],index:index};
+  };
+  GoApp.prototype.radio63FallbackDetail=function(reason,station){
+    var key=reason==='offline'?'fallbackOffline':(reason==='stream'?'fallbackStream':'fallbackManual');
+    return radio63LocalText(this.state.lang,key)+(station&&station.name?' · '+station.name:'');
+  };
+  GoApp.prototype.radio63StartLocalFallback=function(reason,forcedIndex){
+    var self=this,rows=this.state.localTracks||[],pick=(forcedIndex!==undefined&&forcedIndex!==null&&rows[forcedIndex])?{track:rows[forcedIndex],index:forcedIndex}:this.radio63PickRandomTrack();if(!pick)return false;
+    var station=this.radio63FallbackStation||this.activeStation||((this.audioKind==='radio'&&this.state.player)?this.state.player.station:null);
+    if(station&&station.country!=='LOCAL')this.radio63FallbackStation=station;
+    clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);clearTimeout(this.radio63OfflineFallbackTimer);clearTimeout(this.radio63ReturnTimer);
+    this.playerWanted=false;this.streamAttempt+=1;this.failedStreamAttempt=-1;this.reconnectAttempt=0;
+    if(this.hls){try{this.hls.destroy();}catch(_){}this.hls=null;}
+    var old=this.audio;this.audio=null;if(old){try{old.pause();}catch(_){}try{old.removeAttribute('src');old.load();}catch(_){}}
+    if(this.localObjectUrl){try{URL.revokeObjectURL(this.localObjectUrl);}catch(_){}this.localObjectUrl=null;}
+    var blob=pick.track.file||pick.track.blob;if(!blob)return false;
+    try{this.localObjectUrl=URL.createObjectURL(blob);}catch(_){return false;}
+    var audio=new Audio();this.audio=audio;this.audioKind='local-fallback';this.radio63FallbackMode=reason||'manual';
+    audio.preload='auto';audio.playsInline=true;audio.setAttribute('playsinline','');audio.src=this.localObjectUrl;
+    audio.addEventListener('playing',function(){if(audio!==self.audio||self.audioKind!=='local-fallback')return;self.setPlayerState({status:'playing',playing:true,detail:self.radio63FallbackDetail(self.radio63FallbackMode,self.radio63FallbackStation)});});
+    audio.addEventListener('pause',function(){if(audio!==self.audio||self.audioKind!=='local-fallback')return;if(!audio.ended)self.setPlayerState({status:'paused',playing:false,detail:self.radio63FallbackDetail(self.radio63FallbackMode,self.radio63FallbackStation)});});
+    audio.addEventListener('ended',function(){if(audio!==self.audio||self.audioKind!=='local-fallback')return;self.radio63FinishFallbackTrack();});
+    audio.addEventListener('error',function(){if(audio!==self.audio||self.audioKind!=='local-fallback')return;if((self.state.localTracks||[]).length>1)self.radio63StartLocalFallback(self.radio63FallbackMode);else self.radio63FinishFallbackTrack();});
+    this.setState({localTrackIndex:pick.index,player:{station:{id:pick.track.id,name:pick.track.name,country:'LOCAL',favicon:''},status:'connecting',playing:false,detail:this.radio63FallbackDetail(reason,station),kind:'local'}},function(){
+      var promise;try{promise=audio.play();}catch(error){promise=null;self.showToast(error&&error.message?error.message:'Audio playback could not start.',true);}if(promise&&promise.catch)promise.catch(function(error){self.setPlayerState({status:'paused',playing:false});if(error&&error.name!=='AbortError')self.showToast(error.message||'Audio playback could not start.',true);});
+    });
+    if('mediaSession' in navigator){
+      try{if(window.MediaMetadata)navigator.mediaSession.metadata=new MediaMetadata({title:pick.track.name,artist:'Radio 63 backup music',album:'On-device audio'});}catch(_){}
+      try{navigator.mediaSession.setActionHandler('play',function(){if(self.audio&&self.audioKind==='local-fallback'){var p=self.audio.play();if(p&&p.catch)p.catch(function(){});}});}catch(_){}
+      try{navigator.mediaSession.setActionHandler('pause',function(){if(self.audio&&self.audioKind==='local-fallback')self.audio.pause();});}catch(_){}
+      try{navigator.mediaSession.setActionHandler('nexttrack',function(){self.radio63StartLocalFallback(self.radio63FallbackMode);});}catch(_){}
+      try{navigator.mediaSession.setActionHandler('previoustrack',function(){self.radio63StartLocalFallback(self.radio63FallbackMode);});}catch(_){}
+    }
+    return true;
+  };
+  GoApp.prototype.radio63FinishFallbackTrack=function(){
+    if(this.radio63FallbackStation&&navigator.onLine!==false){this.radio63ReturnToRadio();return;}
+    if(this.radio63HasLocalTracks()){this.radio63StartLocalFallback(this.radio63FallbackMode||'offline');return;}
+    this.setPlayerState({status:'paused',playing:false,detail:''});
+  };
+  GoApp.prototype.radio63ReturnToRadio=function(){
+    var self=this,station=this.radio63FallbackStation||this.activeStation;if(!station||station.country==='LOCAL')return false;
+    clearTimeout(this.radio63ReturnTimer);clearTimeout(this.radio63OfflineFallbackTimer);
+    var old=this.audio;this.audio=null;if(old){try{old.pause();}catch(_){}try{old.removeAttribute('src');old.load();}catch(_){}}
+    if(this.localObjectUrl){try{URL.revokeObjectURL(this.localObjectUrl);}catch(_){}this.localObjectUrl=null;}
+    this.audioKind='radio';this.activeStation=station;this.playerCandidates=this.buildStreamCandidates(station);this.playerUrlIndex=0;this.reconnectAttempt=0;this.playerWanted=true;
+    this.setState({localTrackIndex:-1,player:{station:station,status:'connecting',playing:false,detail:'',kind:'radio'}},function(){self.startStream(station);});
+    return true;
+  };
+  GoApp.prototype.radio63ClearLocalTracks=function(){
+    var self=this;
+    if(this.audioKind==='local-fallback'){if(this.radio63FallbackStation&&navigator.onLine!==false)this.radio63ReturnToRadio();else this.stopPlayer();}
+    this.setState({localTracks:[],localTrackIndex:-1,radio63LocalVersion:Number(this.state.radio63LocalVersion||0)+1});
+    radio63LocalClearDb().catch(function(){}).then(function(){self.showToast(radio63LocalText(self.state.lang,'clearedToast'));});
+  };
+
+  var radio63PlayStation133=GoApp.prototype.playStation;
+  GoApp.prototype.playStation=function(station){this.radio63FallbackStation=station;this.radio63FallbackMode=null;clearTimeout(this.radio63OfflineFallbackTimer);clearTimeout(this.radio63ReturnTimer);return radio63PlayStation133.call(this,station);};
+
+  var radio63SetupAudio133=GoApp.prototype.setupAudio;
+  GoApp.prototype.setupAudio=function(attempt){
+    radio63SetupAudio133.call(this,attempt);
+    var self=this,audio=this.audio,expected=attempt==null?this.streamAttempt:attempt;if(!audio)return;
+    audio.preload='auto';
+    audio.addEventListener('waiting',function(){if(audio!==self.audio||self.audioKind!=='radio'||expected!==self.streamAttempt||!self.playerWanted||audio.paused)return;self.scheduleRadioFailure(8000,expected);});
+    audio.addEventListener('stalled',function(){if(audio!==self.audio||self.audioKind!=='radio'||expected!==self.streamAttempt||!self.playerWanted)return;self.scheduleRadioFailure(6500,expected);});
+  };
+
+  var radio63Failure133=GoApp.prototype.radioFailure;
+  GoApp.prototype.radioFailure=function(attempt){
+    var expected=attempt==null?this.streamAttempt:attempt;
+    var finalCandidate=this.playerCandidates&&this.playerCandidates.length?this.playerUrlIndex+1>=this.playerCandidates.length:true;
+    if(this.audioKind==='radio'&&this.playerWanted&&expected===this.streamAttempt&&finalCandidate&&this.radio63LocalFallbackEnabled()&&this.radio63HasLocalTracks()){
+      this.radio63StartLocalFallback(navigator.onLine===false?'offline':'stream');return;
+    }
+    return radio63Failure133.call(this,attempt);
+  };
+
+  var radio63TogglePlayer133=GoApp.prototype.togglePlayer;
+  GoApp.prototype.togglePlayer=function(){
+    if(this.audioKind==='local-fallback'){
+      if(!this.audio)return;
+      if(!this.audio.paused){this.audio.pause();this.setPlayerState({status:'paused',playing:false});}
+      else{var p=this.audio.play();if(p&&p.catch)p.catch(function(){});}
+      return;
+    }
+    return radio63TogglePlayer133.call(this);
+  };
+  var radio63ResumePlayer133=GoApp.prototype.resumePlayer;
+  GoApp.prototype.resumePlayer=function(){if(this.audioKind==='local-fallback'){if(this.audio){var p=this.audio.play();if(p&&p.catch)p.catch(function(){});}return;}return radio63ResumePlayer133.call(this);};
+  var radio63StopPlayer133=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){clearTimeout(this.radio63OfflineFallbackTimer);clearTimeout(this.radio63ReturnTimer);this.radio63FallbackStation=null;this.radio63FallbackMode=null;return radio63StopPlayer133.call(this);};
+
+  GoApp.prototype.renderRadio63LocalFallback=function(){
+    var self=this,lang=this.state.lang||'en',tracks=this.state.localTracks||[],enabled=this.radio63LocalFallbackEnabled(),active=this.audioKind==='local-fallback';
+    return h('section',{className:'panel radio63-local-backup'},
+      h('div',{className:'radio63-local-head'},h('div',null,h('span',{className:'eyebrow'},'OFFLINE + AD BREAK'),h('h2',null,radio63LocalText(lang,'title')),h('p',null,radio63LocalText(lang,'desc'))),h('div',{className:'radio63-local-count'},String(tracks.length),h('span',null,' '+radio63LocalText(lang,'saved')))),
+      h('div',{className:'radio63-local-actions'},
+        h('label',{className:'btn primary file-picker'},radio63LocalText(lang,'choose'),h('input',{type:'file',accept:'audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac,.opus',multiple:true,onChange:this.handleLocalFiles})),
+        h('button',{type:'button',className:'btn secondary',disabled:!tracks.length,onClick:function(){self.radio63StartLocalFallback('manual');}},radio63LocalText(lang,'random')),
+        active&&this.radio63FallbackStation?h('button',{type:'button',className:'btn secondary',onClick:function(){self.radio63ReturnToRadio();}},radio63LocalText(lang,'returnRadio')):null,
+        tracks.length?h('button',{type:'button',className:'btn ghost',onClick:function(){self.radio63ClearLocalTracks();}},radio63LocalText(lang,'clear')):null
+      ),
+      h('div',{className:'radio63-local-switch'},h('div',null,h('strong',null,radio63LocalText(lang,'auto')),h('span',null,radio63LocalText(lang,'autoHelp'))),h('button',{type:'button',className:'switch '+(enabled?'on':''),'aria-pressed':enabled?'true':'false',onClick:function(){self.radio63SetLocalFallbackEnabled(!enabled);}},h('span'))),
+      tracks.length?h('div',{className:'radio63-local-tracks'},tracks.slice(0,8).map(function(track,index){return h('button',{type:'button',key:track.id,className:active&&self.state.localTrackIndex===index?'active':'',onClick:function(){self.radio63StartLocalFallback('manual',index);}},'♫ ',track.name);}),tracks.length>8?h('span',{className:'radio63-local-more'},'+'+(tracks.length-8)):null):h('p',{className:'radio63-local-empty'},radio63LocalText(lang,'none')),
+      h('p',{className:'radio63-local-note'},radio63LocalText(lang,'adNote'))
+    );
+  };
+
+  var radio63RenderView133=GoApp.prototype.renderRadioView;
+  GoApp.prototype.renderRadioView=function(){var base=radio63RenderView133.call(this),children=React.Children.toArray(base.props.children);children.push(this.renderRadio63LocalFallback());return React.cloneElement(base,base.props,children);};
+
+  var radio63DidMount133=GoApp.prototype.componentDidMount;
+  GoApp.prototype.componentDidMount=function(){
+    var result=radio63DidMount133.call(this),self=this;this.radio63LoadLocalTracks();
+    this.radio63OfflineHandler=function(){clearTimeout(self.radio63OfflineFallbackTimer);self.radio63OfflineFallbackTimer=setTimeout(function(){if(navigator.onLine===false&&self.audioKind==='radio'&&self.playerWanted&&self.radio63LocalFallbackEnabled()&&self.radio63HasLocalTracks())self.radio63StartLocalFallback('offline');},3500);};
+    this.radio63FallbackOnlineHandler=function(){clearTimeout(self.radio63OfflineFallbackTimer);if(self.audioKind==='local-fallback'&&self.radio63FallbackStation&&self.radio63FallbackMode!=='manual'){clearTimeout(self.radio63ReturnTimer);self.radio63ReturnTimer=setTimeout(function(){if(navigator.onLine!==false&&self.audioKind==='local-fallback')self.radio63ReturnToRadio();},3000);}};
+    window.addEventListener('offline',this.radio63OfflineHandler);window.addEventListener('online',this.radio63FallbackOnlineHandler);return result;
+  };
+  var radio63WillUnmount133=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){clearTimeout(this.radio63OfflineFallbackTimer);clearTimeout(this.radio63ReturnTimer);if(this.radio63OfflineHandler)window.removeEventListener('offline',this.radio63OfflineHandler);if(this.radio63FallbackOnlineHandler)window.removeEventListener('online',this.radio63FallbackOnlineHandler);return radio63WillUnmount133.call(this);};
+
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);
 }());

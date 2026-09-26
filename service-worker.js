@@ -1,6 +1,6 @@
 'use strict';
 
-var VERSION = '1.3.3';
+var VERSION = '1.3.4';
 var STATIC_CACHE = 'go-app-static-' + VERSION;
 var TILE_CACHE = 'go-app-map-tiles-' + VERSION;
 var DATA_CACHE = 'go-app-data-' + VERSION;

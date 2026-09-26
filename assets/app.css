@@ -2095,3 +2095,30 @@ html.theme-day #go-app-root{
     max-height:100dvh!important;
   }
 }
+
+/* v1.3.4: resilient radio + on-device random backup audio. */
+.radio63-local-backup{margin:18px 0 86px!important;padding:18px!important;background:linear-gradient(145deg,rgba(8,28,34,.96),rgba(12,45,43,.90))!important;border:1px solid rgba(109,245,139,.16)!important;}
+.radio63-local-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;}
+.radio63-local-head h2{margin:6px 0 5px;font-size:22px;}
+.radio63-local-head p{margin:0;color:var(--muted);max-width:72ch;font-size:13px;line-height:1.55;}
+.radio63-local-count{min-width:92px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.04);font-size:20px;font-weight:900;text-align:center;}
+.radio63-local-count span{display:block;margin-top:2px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.radio63-local-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px;}
+.radio63-local-actions .file-picker{position:relative;overflow:hidden;cursor:pointer;}
+.radio63-local-actions .file-picker input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.radio63-local-actions .btn:disabled{opacity:.45;cursor:not-allowed;}
+.radio63-local-switch{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-top:14px;padding:13px 14px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.035);}
+.radio63-local-switch strong,.radio63-local-switch span{display:block;}
+.radio63-local-switch>div>span{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.4;}
+.radio63-local-tracks{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;}
+.radio63-local-tracks button,.radio63-local-more{max-width:230px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.04);color:var(--text);font:inherit;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.radio63-local-tracks button.active{border-color:rgba(109,245,139,.55);background:rgba(109,245,139,.12);}
+.radio63-local-more{display:inline-flex;align-items:center;justify-content:center;min-width:36px;}
+.radio63-local-empty,.radio63-local-note{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.45;}
+.radio63-local-note{padding-top:10px;border-top:1px solid rgba(255,255,255,.06);}
+@media(max-width:620px){
+  .radio63-local-backup{margin-bottom:96px!important;padding:14px!important;}
+  .radio63-local-head{display:block;}.radio63-local-count{margin-top:12px;width:max-content;min-width:84px;}
+  .radio63-local-actions{display:grid;grid-template-columns:1fr;}.radio63-local-actions .btn{width:100%;}
+  .radio63-local-switch{align-items:flex-start;}.radio63-local-tracks button{max-width:100%;}
+}
