@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const GO_APP_VERSION = '1.3.4';
+const GO_APP_VERSION = '1.3.5';
 
 function go_supported_languages(): array
 {

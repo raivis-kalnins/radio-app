@@ -4685,10 +4685,10 @@
   var RADIO63_LOCAL_STORE = 'tracks';
   var RADIO63_LOCAL_LIMIT = 30;
   var RADIO63_LOCAL_TEXT = {
-    en:{title:'Backup music',desc:'Choose MP3/audio files from this device. Radio 63 can play them at random if a stream drops or the internet goes offline.',choose:'Choose audio files',auto:'Automatic fallback',autoHelp:'Use random local music when live radio cannot continue.',random:'Random local (ad break)',returnRadio:'Return to live radio',clear:'Clear saved audio',saved:'saved on this device',none:'No local audio selected yet.',fallbackOffline:'Offline backup',fallbackStream:'Stream backup',fallbackManual:'Local music',savedToast:'Local backup music saved on this device.',clearedToast:'Saved local audio cleared.',saveError:'The files can be used now, but this browser could not save all of them for later.',adNote:'Live radio adverts are not exposed reliably by every stream. Use “Random local (ad break)” when you want to skip an advert manually.'},
-    lv:{title:'Rezerves mūzika',desc:'Izvēlies MP3/audio failus no šīs ierīces. Ja radio straume apstājas vai pazūd internets, Radio 63 var nejauši atskaņot vietējo mūziku.',choose:'Izvēlēties audio failus',auto:'Automātiska rezerve',autoHelp:'Ja tiešraides radio nevar turpināties, atskaņot nejaušu vietējo mūziku.',random:'Nejauša dziesma (reklāmas pauze)',returnRadio:'Atgriezties tiešraidē',clear:'Notīrīt saglabāto audio',saved:'saglabāti šajā ierīcē',none:'Vietējie audio faili vēl nav izvēlēti.',fallbackOffline:'Bezsaistes rezerve',fallbackStream:'Straumes rezerve',fallbackManual:'Vietējā mūzika',savedToast:'Rezerves mūzika saglabāta šajā ierīcē.',clearedToast:'Saglabātais vietējais audio notīrīts.',saveError:'Failus var izmantot tagad, bet pārlūks nevarēja visus saglabāt vēlākai lietošanai.',adNote:'Tiešraides radio reklāmas ne visas straumes ļauj droši noteikt. Izmanto “Nejauša dziesma (reklāmas pauze)”, ja reklāmas laikā vēlies ieslēgt savu mūziku.'},
-    ru:{title:'Резервная музыка',desc:'Выберите MP3/аудиофайлы на этом устройстве. Если поток радио остановится или пропадёт интернет, Radio 63 сможет случайно включать локальную музыку.',choose:'Выбрать аудиофайлы',auto:'Автоматический резерв',autoHelp:'Включать случайную локальную музыку, если эфир не может продолжаться.',random:'Случайный трек (реклама)',returnRadio:'Вернуться к эфиру',clear:'Очистить сохранённые аудио',saved:'сохранено на устройстве',none:'Локальные аудиофайлы ещё не выбраны.',fallbackOffline:'Резерв без интернета',fallbackStream:'Резерв потока',fallbackManual:'Локальная музыка',savedToast:'Резервная музыка сохранена на этом устройстве.',clearedToast:'Сохранённые локальные аудио удалены.',saveError:'Файлы можно использовать сейчас, но браузеру не удалось сохранить все из них на будущее.',adNote:'Рекламу в прямом эфире нельзя надёжно определить во всех потоках. Используйте “Случайный трек (реклама)” вручную.'},
-    uk:{title:'Резервна музика',desc:'Виберіть MP3/аудіофайли на цьому пристрої. Якщо радіопотік зупиниться або зникне інтернет, Radio 63 зможе випадково відтворювати локальну музику.',choose:'Вибрати аудіофайли',auto:'Автоматичний резерв',autoHelp:'Вмикати випадкову локальну музику, якщо прямий ефір не може продовжуватися.',random:'Випадковий трек (реклама)',returnRadio:'Повернутися до ефіру',clear:'Очистити збережене аудіо',saved:'збережено на пристрої',none:'Локальні аудіофайли ще не вибрані.',fallbackOffline:'Резерв без інтернету',fallbackStream:'Резерв потоку',fallbackManual:'Локальна музика',savedToast:'Резервну музику збережено на цьому пристрої.',clearedToast:'Збережені локальні аудіо очищено.',saveError:'Файли можна використовувати зараз, але браузеру не вдалося зберегти всі з них для подальшого використання.',adNote:'Рекламу в прямому ефірі неможливо надійно визначити в кожному потоці. Використовуйте “Випадковий трек (реклама)” вручну.'}
+    en:{title:'Backup music',desc:'Choose MP3/audio files from this device. If live radio is unavailable, Radio 63 keeps retrying for 2 minutes before random backup music starts.',choose:'Choose audio files',auto:'Automatic fallback',autoHelp:'Retry live radio for 2 minutes, then use random local music until the station returns.',random:'Random local (ad break)',returnRadio:'Return to live radio',clear:'Clear saved audio',saved:'saved on this device',none:'No local audio selected yet.',fallbackOffline:'Offline backup',fallbackStream:'Stream backup',fallbackManual:'Local music',savedToast:'Local backup music saved on this device.',clearedToast:'Saved local audio cleared.',saveError:'The files can be used now, but this browser could not save all of them for later.',adNote:'Live radio adverts are not exposed reliably by every stream. Use “Random local (ad break)” when you want to skip an advert manually.'},
+    lv:{title:'Rezerves mūzika',desc:'Izvēlies MP3/audio failus no šīs ierīces. Ja tiešraide nav pieejama, Radio 63 2 minūtes turpina mēģināt pieslēgties un tikai tad ieslēdz nejaušu rezerves mūziku.',choose:'Izvēlēties audio failus',auto:'Automātiska rezerve',autoHelp:'2 minūtes mēģināt atjaunot radio, pēc tam atskaņot nejaušu vietējo mūziku līdz stacija atkal ir pieejama.',random:'Nejauša dziesma (reklāmas pauze)',returnRadio:'Atgriezties tiešraidē',clear:'Notīrīt saglabāto audio',saved:'saglabāti šajā ierīcē',none:'Vietējie audio faili vēl nav izvēlēti.',fallbackOffline:'Bezsaistes rezerve',fallbackStream:'Straumes rezerve',fallbackManual:'Vietējā mūzika',savedToast:'Rezerves mūzika saglabāta šajā ierīcē.',clearedToast:'Saglabātais vietējais audio notīrīts.',saveError:'Failus var izmantot tagad, bet pārlūks nevarēja visus saglabāt vēlākai lietošanai.',adNote:'Tiešraides radio reklāmas ne visas straumes ļauj droši noteikt. Izmanto “Nejauša dziesma (reklāmas pauze)”, ja reklāmas laikā vēlies ieslēgt savu mūziku.'},
+    ru:{title:'Резервная музыка',desc:'Выберите MP3/аудиофайлы на этом устройстве. Если эфир недоступен, Radio 63 продолжает переподключение 2 минуты и только потом включает случайную резервную музыку.',choose:'Выбрать аудиофайлы',auto:'Автоматический резерв',autoHelp:'Пробовать вернуть эфир 2 минуты, затем включать случайную локальную музыку до восстановления станции.',random:'Случайный трек (реклама)',returnRadio:'Вернуться к эфиру',clear:'Очистить сохранённые аудио',saved:'сохранено на устройстве',none:'Локальные аудиофайлы ещё не выбраны.',fallbackOffline:'Резерв без интернета',fallbackStream:'Резерв потока',fallbackManual:'Локальная музыка',savedToast:'Резервная музыка сохранена на этом устройстве.',clearedToast:'Сохранённые локальные аудио удалены.',saveError:'Файлы можно использовать сейчас, но браузеру не удалось сохранить все из них на будущее.',adNote:'Рекламу в прямом эфире нельзя надёжно определить во всех потоках. Используйте “Случайный трек (реклама)” вручную.'},
+    uk:{title:'Резервна музика',desc:'Виберіть MP3/аудіофайли на цьому пристрої. Якщо ефір недоступний, Radio 63 продовжує перепідключення 2 хвилини і лише потім вмикає випадкову резервну музику.',choose:'Вибрати аудіофайли',auto:'Автоматичний резерв',autoHelp:'Пробувати відновити ефір 2 хвилини, потім відтворювати випадкову локальну музику до повернення станції.',random:'Випадковий трек (реклама)',returnRadio:'Повернутися до ефіру',clear:'Очистити збережене аудіо',saved:'збережено на пристрої',none:'Локальні аудіофайли ще не вибрані.',fallbackOffline:'Резерв без інтернету',fallbackStream:'Резерв потоку',fallbackManual:'Локальна музика',savedToast:'Резервну музику збережено на цьому пристрої.',clearedToast:'Збережені локальні аудіо очищено.',saveError:'Файли можна використовувати зараз, але браузеру не вдалося зберегти всі з них для подальшого використання.',adNote:'Рекламу в прямому ефірі неможливо надійно визначити в кожному потоці. Використовуйте “Випадковий трек (реклама)” вручну.'}
   };
   function radio63LocalText(lang,key){var row=RADIO63_LOCAL_TEXT[lang]||RADIO63_LOCAL_TEXT.en;return row[key]!==undefined?row[key]:RADIO63_LOCAL_TEXT.en[key];}
   function radio63LocalDbOpen(){
@@ -4871,6 +4871,198 @@
   };
   var radio63WillUnmount133=GoApp.prototype.componentWillUnmount;
   GoApp.prototype.componentWillUnmount=function(){clearTimeout(this.radio63OfflineFallbackTimer);clearTimeout(this.radio63ReturnTimer);if(this.radio63OfflineHandler)window.removeEventListener('offline',this.radio63OfflineHandler);if(this.radio63FallbackOnlineHandler)window.removeEventListener('online',this.radio63FallbackOnlineHandler);return radio63WillUnmount133.call(this);};
+
+
+  /* Radio 63 1.3.5: two-minute live-radio grace period and automatic return.
+     A connection/stream loss keeps retrying live radio for two minutes. Only
+     after that grace period do saved on-device tracks take over. While backup
+     music is active, Radio 63 watches for connectivity and returns to the last
+     live station automatically. */
+  var RADIO63_FALLBACK_GRACE_MS = 2 * 60 * 1000;
+  var RADIO63_FALLBACK_PROBE_MS = 12000;
+
+  GoApp.prototype.radio63FallbackCountdownText=function(remainingMs){
+    var seconds=Math.max(0,Math.ceil(Number(remainingMs||0)/1000)),minutes=Math.floor(seconds/60),rest=seconds%60,time=minutes+':'+(rest<10?'0'+rest:String(rest)),lang=this.state.lang||'en';
+    var prefix={en:'Retrying live radio · backup in ',lv:'Atjauno radio · rezerve pēc ',ru:'Переподключение · резерв через ',uk:'Перепідключення · резерв через '}[lang]||'Retrying live radio · backup in ';
+    return prefix+time;
+  };
+
+  GoApp.prototype.radio63RememberStation135=function(station){
+    if(!station||station.country==='LOCAL')return;
+    this.radio63FallbackStation=station;
+    try{localStorage.setItem('radio63-last-station-v2',JSON.stringify({id:station.id,name:station.name,country:station.country,favicon:station.favicon||'',tags:station.tags||'',codec:station.codec||'',bitrate:station.bitrate||0,homepage:station.homepage||'',urls:Array.isArray(station.urls)?station.urls:[],relayUrls:Array.isArray(station.relayUrls)?station.relayUrls:[]}));}catch(_){}
+  };
+
+  GoApp.prototype.radio63ClearGrace135=function(resetOutage){
+    clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;
+    if(resetOutage!==false)this.radio63OutageSince135=0;
+  };
+
+  GoApp.prototype.radio63ScheduleGrace135=function(reason){
+    var self=this;
+    if(this.audioKind!=='radio'||!this.playerWanted)return;
+    if(!this.radio63OutageSince135)this.radio63OutageSince135=Date.now();
+    clearTimeout(this.radio63GraceTimer135);
+    var remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-(Date.now()-this.radio63OutageSince135));
+    this.radio63GraceTimer135=setTimeout(function(){
+      if(self.audioKind!=='radio'||!self.playerWanted||(self.state.player&&self.state.player.playing))return;
+      if(self.radio63LocalFallbackEnabled()&&self.radio63HasLocalTracks())self.radio63StartLocalFallback(navigator.onLine===false?'offline':(reason||'stream'));
+    },Math.max(50,remaining));
+  };
+
+  GoApp.prototype.radio63ProbeOrigin135=function(){
+    var controller=typeof AbortController!=='undefined'?new AbortController():null,timer=null;
+    var url;
+    try{url=new URL(window.location.pathname||'./',window.location.href);url.searchParams.set('radio63_connection_probe',String(Date.now()));}catch(_){return Promise.resolve(false);}
+    if(controller)timer=setTimeout(function(){try{controller.abort();}catch(_){}},6000);
+    return fetch(url.toString(),{method:'HEAD',cache:'no-store',credentials:'same-origin',signal:controller?controller.signal:undefined}).then(function(){return true;}).catch(function(){return false;}).then(function(ok){if(timer)clearTimeout(timer);return ok;});
+  };
+
+  GoApp.prototype.radio63ScheduleReturnProbe135=function(){
+    var self=this;
+    clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    if(this.audioKind!=='local-fallback'||this.radio63FallbackMode==='manual'||!this.radio63FallbackStation)return;
+    this.radio63ReconnectProbeTimer135=setTimeout(function(){
+      if(self.audioKind!=='local-fallback'||self.radio63FallbackMode==='manual'||!self.radio63FallbackStation)return;
+      if(navigator.onLine===false){self.radio63ScheduleReturnProbe135();return;}
+      self.radio63ProbeOrigin135().then(function(reachable){
+        if(self.audioKind!=='local-fallback'||self.radio63FallbackMode==='manual')return;
+        if(reachable)self.radio63ReturnToRadio();else self.radio63ScheduleReturnProbe135();
+      });
+    },RADIO63_FALLBACK_PROBE_MS);
+  };
+
+  var radio63PlayStation135=GoApp.prototype.playStation;
+  GoApp.prototype.playStation=function(station){
+    clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    this.radio63RecoveringFromFallback135=false;this.radio63ClearGrace135(true);this.radio63RememberStation135(station);
+    return radio63PlayStation135.call(this,station);
+  };
+
+  var radio63SetupAudio135=GoApp.prototype.setupAudio;
+  GoApp.prototype.setupAudio=function(attempt){
+    radio63SetupAudio135.call(this,attempt);
+    var self=this,audio=this.audio,expected=attempt==null?this.streamAttempt:attempt;
+    if(!audio)return;
+    function markConnectionLoss(){
+      if(audio!==self.audio||self.audioKind!=='radio'||expected!==self.streamAttempt||!self.playerWanted)return;
+      if(!self.radio63OutageSince135)self.radio63OutageSince135=Date.now();
+      self.radio63ScheduleGrace135(navigator.onLine===false?'offline':'stream');
+    }
+    audio.addEventListener('waiting',markConnectionLoss);
+    audio.addEventListener('stalled',markConnectionLoss);
+    audio.addEventListener('playing',function(){
+      if(audio!==self.audio||self.audioKind!=='radio'||expected!==self.streamAttempt)return;
+      self.radio63RecoveringFromFallback135=false;self.radio63ClearGrace135(true);clearTimeout(self.radio63ReconnectProbeTimer135);self.radio63ReconnectProbeTimer135=null;
+      self.radio63RememberStation135(self.activeStation||(self.state.player&&self.state.player.station));
+    });
+  };
+
+  /* Replace the 1.3.4 immediate fallback with continuous radio retries and a
+     hard two-minute grace period. */
+  GoApp.prototype.radioFailure=function(attempt){
+    var self=this,station=this.activeStation||(this.state.player&&this.state.player.station),expected=attempt==null?this.streamAttempt:attempt;
+    if(this.audioKind!=='radio'||!this.playerWanted||!station||expected!==this.streamAttempt||this.failedStreamAttempt===expected)return;
+    this.failedStreamAttempt=expected;
+    clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);
+    if(this.playerUrlIndex+1<this.playerCandidates.length){
+      this.playerUrlIndex+=1;
+      this.setPlayerState({status:'reconnecting',playing:false,detail:this.t('radioRetrying')});
+      this.reconnectTimer=setTimeout(function(){if(self.playerWanted&&self.audioKind==='radio')self.startStream();},600);
+      return;
+    }
+    this.playerUrlIndex=0;
+    if(this.radio63RecoveringFromFallback135&&this.radio63LocalFallbackEnabled()&&this.radio63HasLocalTracks()){
+      this.radio63RecoveringFromFallback135=false;
+      this.radio63StartLocalFallback(this.radio63FallbackMode&&this.radio63FallbackMode!=='manual'?this.radio63FallbackMode:(navigator.onLine===false?'offline':'stream'));
+      return;
+    }
+    if(!this.radio63OutageSince135)this.radio63OutageSince135=Date.now();
+    var elapsed=Date.now()-this.radio63OutageSince135,remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-elapsed);
+    if(remaining<=0&&this.radio63LocalFallbackEnabled()&&this.radio63HasLocalTracks()){
+      this.radio63StartLocalFallback(navigator.onLine===false?'offline':'stream');
+      return;
+    }
+    this.radio63ScheduleGrace135(navigator.onLine===false?'offline':'stream');
+    this.reconnectAttempt+=1;
+    var offline=navigator.onLine===false,delay=offline?5000:Math.min(20000,1500*Math.pow(2,Math.min(this.reconnectAttempt,4)));
+    this.setPlayerState({status:'reconnecting',playing:false,detail:this.radio63FallbackCountdownText(remaining)});
+    this.reconnectTimer=setTimeout(function(){if(self.playerWanted&&self.audioKind==='radio')self.startStream();},Math.max(700,Math.min(delay,Math.max(700,remaining))));
+  };
+
+  var radio63StartLocalFallback135=GoApp.prototype.radio63StartLocalFallback;
+  GoApp.prototype.radio63StartLocalFallback=function(reason,forcedIndex){
+    clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;
+    this.radio63RecoveringFromFallback135=false;
+    var result=radio63StartLocalFallback135.call(this,reason,forcedIndex);
+    if(result&&reason!=='manual')this.radio63ScheduleReturnProbe135();
+    return result;
+  };
+
+  /* Automatic backup mode keeps choosing random saved tracks. It does not
+     interrupt every track merely because navigator.onLine still says true. */
+  GoApp.prototype.radio63FinishFallbackTrack=function(){
+    if(this.radio63FallbackMode==='manual'&&this.radio63FallbackStation&&navigator.onLine!==false){this.radio63ReturnToRadio();return;}
+    if(this.radio63HasLocalTracks()){this.radio63StartLocalFallback(this.radio63FallbackMode||'offline');return;}
+    this.setPlayerState({status:'paused',playing:false,detail:''});
+  };
+
+  var radio63ReturnToRadio135=GoApp.prototype.radio63ReturnToRadio;
+  GoApp.prototype.radio63ReturnToRadio=function(){
+    clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    this.radio63RecoveringFromFallback135=true;this.radio63ClearGrace135(true);
+    var result=radio63ReturnToRadio135.call(this);
+    if(result===false)this.radio63RecoveringFromFallback135=false;
+    return result;
+  };
+
+  var radio63PausePlayer135=GoApp.prototype.pausePlayer;
+  GoApp.prototype.pausePlayer=function(){
+    this.radio63RecoveringFromFallback135=false;this.radio63ClearGrace135(true);clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    return radio63PausePlayer135.call(this);
+  };
+  var radio63StopPlayer135=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){
+    this.radio63RecoveringFromFallback135=false;this.radio63ClearGrace135(true);clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    return radio63StopPlayer135.call(this);
+  };
+
+  var radio63DidMount135=GoApp.prototype.componentDidMount;
+  GoApp.prototype.componentDidMount=function(){
+    var result=radio63DidMount135.call(this),self=this;
+    /* 1.3.4 installed a 3.5-second offline fallback. Remove those listeners
+       and replace them with the requested two-minute grace behaviour. */
+    if(this.radio63OfflineHandler)window.removeEventListener('offline',this.radio63OfflineHandler);
+    if(this.radio63FallbackOnlineHandler)window.removeEventListener('online',this.radio63FallbackOnlineHandler);
+    if(this.radio63OnlineHandler)window.removeEventListener('online',this.radio63OnlineHandler);
+    try{var saved=JSON.parse(localStorage.getItem('radio63-last-station-v2')||'null');if(saved&&saved.id&&saved.country)this.radio63FallbackStation=saved;}catch(_){}
+    this.radio63OfflineHandler135=function(){
+      if(self.audioKind==='radio'&&self.playerWanted){
+        if(!self.radio63OutageSince135)self.radio63OutageSince135=Date.now();
+        self.radio63ScheduleGrace135('offline');
+        var remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-(Date.now()-self.radio63OutageSince135));
+        self.setPlayerState({status:'reconnecting',playing:false,detail:self.radio63FallbackCountdownText(remaining)});
+      }
+    };
+    this.radio63OnlineHandler135=function(){
+      if(self.audioKind==='local-fallback'&&self.radio63FallbackStation&&self.radio63FallbackMode!=='manual'){
+        self.radio63ReturnToRadio();return;
+      }
+      if(self.audioKind==='radio'&&self.playerWanted){
+        clearTimeout(self.reconnectTimer);self.playerUrlIndex=0;self.reconnectAttempt=0;self.startStream();
+      }
+    };
+    window.addEventListener('offline',this.radio63OfflineHandler135);window.addEventListener('online',this.radio63OnlineHandler135);
+    return result;
+  };
+
+  var radio63WillUnmount135=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){
+    this.radio63ClearGrace135(true);clearTimeout(this.radio63ReconnectProbeTimer135);
+    if(this.radio63OfflineHandler135)window.removeEventListener('offline',this.radio63OfflineHandler135);
+    if(this.radio63OnlineHandler135)window.removeEventListener('online',this.radio63OnlineHandler135);
+    return radio63WillUnmount135.call(this);
+  };
 
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);
