@@ -1592,6 +1592,20 @@ function go_relay_radio_stream(string $url, bool $allowRedirects = false): never
                 return $length;
             },
         ];
+        // Keep long-lived radio sockets healthy through NAT/firewalls and hosting proxies.
+        if (defined('CURLOPT_TCP_KEEPALIVE')) {
+            $curlOptions[CURLOPT_TCP_KEEPALIVE] = 1;
+        }
+        if (defined('CURLOPT_TCP_KEEPIDLE')) {
+            $curlOptions[CURLOPT_TCP_KEEPIDLE] = 15;
+        }
+        if (defined('CURLOPT_TCP_KEEPINTVL')) {
+            $curlOptions[CURLOPT_TCP_KEEPINTVL] = 15;
+        }
+        if (defined('CURLOPT_NOSIGNAL')) {
+            $curlOptions[CURLOPT_NOSIGNAL] = 1;
+        }
+
         // Older Shoutcast/Icecast servers can answer with an ICY or HTTP/0.9-style status line.
         if (defined('CURLOPT_HTTP09_ALLOWED')) {
             $curlOptions[CURLOPT_HTTP09_ALLOWED] = true;

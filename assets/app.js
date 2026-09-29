@@ -5064,6 +5064,106 @@
     return radio63WillUnmount135.call(this);
   };
 
+
+  /* Radio 63 1.3.6: live-stream health watchdog.
+     Some Icecast/Shoutcast streams can stop delivering audio without firing a
+     terminal error. In that case React may still say "playing", which used to
+     suppress the retry timer forever. Judge health from the media element and
+     currentTime progress instead, then rotate to the next stream automatically. */
+  var RADIO63_HEALTH_CHECK_MS = 4000;
+  var RADIO63_STALL_TIMEOUT_MS = 12000;
+  var RADIO63_UNEXPECTED_PAUSE_MS = 3500;
+
+  GoApp.prototype.radio63ClearHealth136=function(){
+    clearInterval(this.radio63HealthTimer136);this.radio63HealthTimer136=null;
+    clearTimeout(this.radio63HealthFailureTimer136);this.radio63HealthFailureTimer136=null;
+  };
+
+  GoApp.prototype.radio63TriggerReconnect136=function(expected){
+    if(this.audioKind!=='radio'||!this.playerWanted||expected!==this.streamAttempt)return;
+    this.radio63ClearHealth136();
+    this.setPlayerState({status:'reconnecting',playing:false,detail:this.t('radioRetrying')});
+    this.radioFailure(expected);
+  };
+
+  /* Do not trust state.player.playing here: a stalled media element can leave
+     that flag true indefinitely. A recovered stream proves itself by advancing
+     currentTime (or by a very recent timeupdate from the same audio instance). */
+  GoApp.prototype.scheduleRadioFailure=function(delay,attempt){
+    var self=this,expected=attempt==null?this.streamAttempt:attempt,audio=this.audio;
+    clearTimeout(this.audioTimer);
+    if(this.audioKind!=='radio'||!audio)return;
+    var baseline=Number(audio.currentTime||0),scheduledAt=Date.now();
+    this.audioTimer=setTimeout(function(){
+      if(self.audioKind!=='radio'||!self.playerWanted||expected!==self.streamAttempt||audio!==self.audio)return;
+      var now=Date.now(),current=Number(audio.currentTime||0),progressed=isFinite(current)&&isFinite(baseline)&&current>baseline+0.35;
+      var recentProgress=now-Number(self.radio63LastProgressAt136||scheduledAt)<2500;
+      var healthy=!audio.paused&&!audio.ended&&!audio.error&&(recentProgress||(progressed&&audio.readyState>=2));
+      if(healthy)return;
+      self.radio63TriggerReconnect136(expected);
+    },Math.max(500,Number(delay||7000)));
+  };
+
+  var radio63SetupAudio136=GoApp.prototype.setupAudio;
+  GoApp.prototype.setupAudio=function(attempt){
+    this.radio63ClearHealth136();
+    radio63SetupAudio136.call(this,attempt);
+    var self=this,audio=this.audio,expected=attempt==null?this.streamAttempt:attempt;
+    if(!audio||this.audioKind!=='radio')return;
+    var startedAt=Date.now(),lastTime=Number(audio.currentTime||0),hasPlayed=false;
+    this.radio63LastProgressAt136=startedAt;
+
+    function valid(){return audio===self.audio&&self.audioKind==='radio'&&expected===self.streamAttempt&&self.playerWanted;}
+    function markProgress(force){
+      if(!valid())return;
+      var current=Number(audio.currentTime||0);
+      if(force||!isFinite(lastTime)||!isFinite(current)||current>lastTime+0.12||current+0.5<lastTime){
+        lastTime=current;self.radio63LastProgressAt136=Date.now();
+      }
+    }
+    function schedulePauseRecovery(){
+      if(!valid()||!hasPlayed)return;
+      self.scheduleRadioFailure(RADIO63_UNEXPECTED_PAUSE_MS,expected);
+    }
+
+    audio.addEventListener('playing',function(){hasPlayed=true;markProgress(true);});
+    audio.addEventListener('timeupdate',function(){markProgress(false);});
+    audio.addEventListener('pause',schedulePauseRecovery);
+    audio.addEventListener('abort',schedulePauseRecovery);
+    audio.addEventListener('emptied',schedulePauseRecovery);
+
+    this.radio63HealthTimer136=setInterval(function(){
+      if(!valid()){self.radio63ClearHealth136();return;}
+      var now=Date.now(),current=Number(audio.currentTime||0);
+      if(!audio.paused&&!audio.ended&&!audio.error&&isFinite(current)&&isFinite(lastTime)&&current>lastTime+0.18){
+        lastTime=current;self.radio63LastProgressAt136=now;return;
+      }
+      if(audio.error||audio.ended){self.radio63TriggerReconnect136(expected);return;}
+      if(!hasPlayed){
+        /* startStream already has its own 10-16 second connection timeout. */
+        return;
+      }
+      var quietFor=now-Number(self.radio63LastProgressAt136||startedAt);
+      if((audio.paused&&quietFor>=RADIO63_UNEXPECTED_PAUSE_MS)||(!audio.paused&&quietFor>=RADIO63_STALL_TIMEOUT_MS)){
+        self.radio63TriggerReconnect136(expected);
+      }
+    },RADIO63_HEALTH_CHECK_MS);
+  };
+
+  var radio63StartLocalFallback136=GoApp.prototype.radio63StartLocalFallback;
+  GoApp.prototype.radio63StartLocalFallback=function(reason,forcedIndex){
+    this.radio63ClearHealth136();
+    return radio63StartLocalFallback136.call(this,reason,forcedIndex);
+  };
+
+  var radio63PausePlayer136=GoApp.prototype.pausePlayer;
+  GoApp.prototype.pausePlayer=function(){this.radio63ClearHealth136();return radio63PausePlayer136.call(this);};
+  var radio63StopPlayer136=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){this.radio63ClearHealth136();return radio63StopPlayer136.call(this);};
+
+  var radio63WillUnmount136=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){this.radio63ClearHealth136();return radio63WillUnmount136.call(this);};
+
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);
 }());
