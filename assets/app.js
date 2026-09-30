@@ -4560,7 +4560,7 @@
   GoApp.prototype.setView=function(){this.setState({view:'radio'});};
   GoApp.prototype.loadSavedPlaces=function(){};
   GoApp.prototype.loadReports=function(){};
-  GoApp.prototype.handleSpotifyCallback=function(){};
+  /* Spotify callback remains enabled in Radio 63 so drivers can connect Spotify backup. */
 
   /* Radio 63 1.2.6: replace inherited GO welcome page with a Radio-only home. */
   GoApp.prototype.renderWelcome=function(){
@@ -5163,6 +5163,251 @@
 
   var radio63WillUnmount136=GoApp.prototype.componentWillUnmount;
   GoApp.prototype.componentWillUnmount=function(){this.radio63ClearHealth136();return radio63WillUnmount136.call(this);};
+
+
+
+  /* Radio 63 1.3.7: driver continuity + Spotify-first backup.
+     Radio stays the primary source. After a continuous two-minute outage the
+     app tries to resume Spotify on an available Spotify Connect device. If
+     Spotify cannot start (or the browser is truly offline), saved on-device
+     audio remains the final fallback. The web/PWA cannot override phone calls
+     or OS audio-focus policy, so recovery is deliberately attempted when the
+     page/app becomes active again rather than fighting the operating system. */
+  var RADIO63_SPOTIFY_RETRY_MS = 30000;
+  var RADIO63_DRIVER_TEXT = {
+    en:{spotifyTitle:'Spotify backup',spotifyDesc:'After 2 minutes without usable live radio, try Spotify first when Internet is available. If Spotify cannot start, use saved MP3/audio.',spotifyAuto:'Try Spotify before local MP3',spotifyAutoHelp:'Requires a connected Spotify Premium account and an available Spotify Connect device.',spotifyReady:'Spotify connected',spotifyNotReady:'Connect Spotify once to enable automatic backup.',spotifyOffline:'Spotify needs Internet, so local MP3 is used when the device is offline.',spotifyStarting:'Starting Spotify backup...',spotifyPlaying:'Spotify backup playing',spotifyPaused:'Spotify backup paused',spotifyUnavailable:'Spotify unavailable - continuing with local backup',returnRadio:'Return to live radio',driverGuard:'Driver playback guard active',driverGuardHelp:'Stalls, app switching and restored connectivity trigger automatic recovery. Phone calls and OS audio focus can still pause a web/PWA.'},
+    lv:{spotifyTitle:'Spotify rezerve',spotifyDesc:'Ja tiešraides radio 2 minūtes nav lietojams, vispirms mēģināt Spotify, ja ir internets. Ja Spotify nevar sākt atskaņošanu, izmantot saglabāto MP3/audio.',spotifyAuto:'Pirms vietējā MP3 mēģināt Spotify',spotifyAutoHelp:'Nepieciešams pieslēgts Spotify Premium konts un pieejama Spotify Connect ierīce.',spotifyReady:'Spotify pieslēgts',spotifyNotReady:'Vienreiz pieslēdz Spotify, lai ieslēgtu automātisko rezervi.',spotifyOffline:'Spotify vajag internetu, tāpēc bezsaistē tiek izmantots vietējais MP3.',spotifyStarting:'Ieslēdz Spotify rezervi...',spotifyPlaying:'Spēlē Spotify rezerve',spotifyPaused:'Spotify rezerve pauzēta',spotifyUnavailable:'Spotify nav pieejams - turpina ar vietējo rezervi',returnRadio:'Atgriezties tiešraidē',driverGuard:'Vadītāja atskaņošanas aizsardzība aktīva',driverGuardHelp:'Pēc straumes apstāšanās, lietotņu pārslēgšanas vai interneta atjaunošanās radio automātiski mēģina turpināt. Tālruņa zvani un OS audio fokuss tīmekļa/PWA lietotni joprojām var īslaicīgi apturēt.'},
+    ru:{spotifyTitle:'Резерв Spotify',spotifyDesc:'Если эфир недоступен 2 минуты, сначала попробовать Spotify при наличии Интернета. Если Spotify не запускается, использовать сохранённые MP3/аудио.',spotifyAuto:'Пробовать Spotify перед локальными MP3',spotifyAutoHelp:'Нужны подключённый Spotify Premium и доступное устройство Spotify Connect.',spotifyReady:'Spotify подключён',spotifyNotReady:'Подключите Spotify один раз для автоматического резерва.',spotifyOffline:'Spotify нужен Интернет, поэтому без сети используется локальный MP3.',spotifyStarting:'Запуск резерва Spotify...',spotifyPlaying:'Играет резерв Spotify',spotifyPaused:'Резерв Spotify на паузе',spotifyUnavailable:'Spotify недоступен - используется локальный резерв',returnRadio:'Вернуться к эфиру',driverGuard:'Защита воспроизведения для водителя активна',driverGuardHelp:'После зависания, переключения приложений или восстановления сети радио автоматически пытается продолжить. Звонки и системный аудиофокус всё равно могут временно остановить веб/PWA.'},
+    uk:{spotifyTitle:'Резерв Spotify',spotifyDesc:'Якщо ефір недоступний 2 хвилини, спочатку спробувати Spotify за наявності Інтернету. Якщо Spotify не запускається, використати збережені MP3/аудіо.',spotifyAuto:'Пробувати Spotify перед локальним MP3',spotifyAutoHelp:'Потрібні підключений Spotify Premium та доступний пристрій Spotify Connect.',spotifyReady:'Spotify підключено',spotifyNotReady:'Підключіть Spotify один раз для автоматичного резерву.',spotifyOffline:'Spotify потребує Інтернету, тому без мережі використовується локальний MP3.',spotifyStarting:'Запуск резерву Spotify...',spotifyPlaying:'Грає резерв Spotify',spotifyPaused:'Резерв Spotify на паузі',spotifyUnavailable:'Spotify недоступний - використовується локальний резерв',returnRadio:'Повернутися до ефіру',driverGuard:'Захист відтворення для водія активний',driverGuardHelp:'Після зависання, перемикання застосунків або відновлення мережі радіо автоматично намагається продовжити. Дзвінки та системний аудіофокус усе одно можуть тимчасово зупинити веб/PWA.'}
+  };
+  function radio63DriverText(lang,key){var row=RADIO63_DRIVER_TEXT[lang]||RADIO63_DRIVER_TEXT.en;return row[key]!==undefined?row[key]:RADIO63_DRIVER_TEXT.en[key];}
+
+  GoApp.prototype.radio63SpotifyFallbackEnabled137=function(){return localStorage.getItem('radio63-spotify-fallback-enabled')!=='0';};
+  GoApp.prototype.radio63SetSpotifyFallbackEnabled137=function(enabled){localStorage.setItem('radio63-spotify-fallback-enabled',enabled?'1':'0');this.setState({radio63SpotifyVersion137:Number(this.state.radio63SpotifyVersion137||0)+1});};
+
+  GoApp.prototype.radio63ActivateSpotifyFallback137=function(reason,data){
+    var self=this,station=this.radio63FallbackStation||this.activeStation||(this.state.player&&this.state.player.station),device=data&&data.deviceName?String(data.deviceName):'';
+    if(station&&station.country!=='LOCAL'&&station.country!=='SPOTIFY')this.radio63FallbackStation=station;
+    clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);clearTimeout(this.radio63GraceTimer135);clearTimeout(this.radio63ReconnectProbeTimer135);
+    this.radio63ClearHealth136();
+    if(this.hls){try{this.hls.destroy();}catch(_){}this.hls=null;}
+    var old=this.audio;this.audio=null;if(old){try{old.pause();}catch(_){}try{old.removeAttribute('src');old.load();}catch(_){} }
+    if(this.localObjectUrl){try{URL.revokeObjectURL(this.localObjectUrl);}catch(_){}this.localObjectUrl=null;}
+    this.playerWanted=false;this.streamAttempt+=1;this.failedStreamAttempt=-1;this.reconnectAttempt=0;
+    this.audioKind='spotify-fallback';this.radio63FallbackMode=reason||'stream';this.radio63SpotifyFallbackActive137=true;this.radio63RecoveringFromFallback135=false;
+    this.setPlayerState({station:station||{id:'spotify-backup',name:'Spotify',country:'SPOTIFY',favicon:''},status:'playing',playing:true,detail:radio63DriverText(this.state.lang,'spotifyPlaying')+(device?' · '+device:''),kind:'spotify'});
+    setTimeout(function(){if(self.state.user)self.loadSpotifyStatus();},900);
+    this.radio63ScheduleReturnProbe135();
+    return true;
+  };
+
+  GoApp.prototype.radio63TrySpotifyFallback137=function(reason){
+    var self=this,config=this.state.spotifyConfig||{},now=Date.now(),generation=Number(this.radio63FallbackGeneration137||0);
+    if(!this.radio63SpotifyFallbackEnabled137()||navigator.onLine===false||!this.state.user||!config.enabled||!config.clientId)return Promise.resolve(false);
+    if(this.radio63SpotifyFallbackPending137)return this.radio63SpotifyFallbackPending137;
+    if(now-Number(this.radio63LastSpotifyFallbackAttempt137||0)<RADIO63_SPOTIFY_RETRY_MS)return Promise.resolve(false);
+    this.radio63LastSpotifyFallbackAttempt137=now;
+    this.setPlayerState({status:'reconnecting',playing:false,detail:radio63DriverText(this.state.lang,'spotifyStarting')});
+    var task=this.api('spotify_fallback_start',{method:'POST',body:{reason:reason||'stream'},timeout:10000}).then(function(data){
+      if(generation!==Number(self.radio63FallbackGeneration137||0)||!self.state.player||!self.state.player.station)return false;
+      if(!data||!data.started)return false;
+      self.radio63ActivateSpotifyFallback137(reason,data);return true;
+    }).catch(function(){return false;});
+    var wrapped=task.then(function(value){if(self.radio63SpotifyFallbackPending137===wrapped)self.radio63SpotifyFallbackPending137=null;return value;},function(){if(self.radio63SpotifyFallbackPending137===wrapped)self.radio63SpotifyFallbackPending137=null;return false;});
+    this.radio63SpotifyFallbackPending137=wrapped;
+    return wrapped;
+  };
+
+  GoApp.prototype.radio63ContinueRadioRetry137=function(reason){
+    var self=this;
+    if(this.audioKind!=='radio')this.audioKind='radio';
+    this.playerWanted=true;this.reconnectAttempt+=1;
+    var delay=navigator.onLine===false?5000:Math.min(20000,2500*Math.pow(2,Math.min(this.reconnectAttempt,3)));
+    this.setPlayerState({status:'reconnecting',playing:false,detail:navigator.onLine===false?radio63Text(this.state.lang,'offline'):this.t('radioRetrying')});
+    clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(function(){if(self.playerWanted&&self.audioKind==='radio')self.startStream();},delay);
+  };
+
+  GoApp.prototype.radio63BeginFallback137=function(reason){
+    var self=this;
+    if(this.radio63FallbackTransition137)return;
+    var generation=Number(this.radio63FallbackGeneration137||0);
+    this.radio63FallbackTransition137=true;
+    this.radio63TrySpotifyFallback137(reason).then(function(started){
+      if(generation!==Number(self.radio63FallbackGeneration137||0)){self.radio63FallbackTransition137=false;return;}
+      self.radio63FallbackTransition137=false;
+      if(started)return;
+      if(self.radio63LocalFallbackEnabled()&&self.radio63HasLocalTracks()){
+        self.setPlayerState({detail:radio63DriverText(self.state.lang,'spotifyUnavailable')});
+        self.radio63StartLocalFallback(reason||'stream');return;
+      }
+      self.radio63ContinueRadioRetry137(reason);
+    },function(){self.radio63FallbackTransition137=false;self.radio63ContinueRadioRetry137(reason);});
+  };
+
+  /* Replace the local-only two-minute timer with Spotify -> local -> radio retry. */
+  GoApp.prototype.radio63ScheduleGrace135=function(reason){
+    var self=this;
+    if(this.audioKind!=='radio'||!this.playerWanted)return;
+    if(!this.radio63OutageSince135)this.radio63OutageSince135=Date.now();
+    clearTimeout(this.radio63GraceTimer135);
+    var remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-(Date.now()-this.radio63OutageSince135));
+    this.radio63GraceTimer135=setTimeout(function(){
+      if(self.audioKind!=='radio'||!self.playerWanted)return;
+      self.radio63BeginFallback137(navigator.onLine===false?'offline':(reason||'stream'));
+    },remaining);
+  };
+
+  /* Keep the same candidate rotation, but route the terminal outage through the
+     Spotify-first fallback chain instead of jumping directly to local MP3. */
+  GoApp.prototype.radioFailure=function(attempt){
+    var self=this,station=this.activeStation||(this.state.player&&this.state.player.station),expected=attempt==null?this.streamAttempt:attempt;
+    if(this.audioKind!=='radio'||!this.playerWanted||!station||expected!==this.streamAttempt||this.failedStreamAttempt===expected)return;
+    this.failedStreamAttempt=expected;
+    clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);
+    if(this.playerUrlIndex+1<this.playerCandidates.length){
+      this.playerUrlIndex+=1;this.setPlayerState({status:'reconnecting',playing:false,detail:this.t('radioRetrying')});
+      this.reconnectTimer=setTimeout(function(){if(self.playerWanted&&self.audioKind==='radio')self.startStream();},600);return;
+    }
+    this.playerUrlIndex=0;
+    if(this.radio63RecoveringFromFallback135){this.radio63RecoveringFromFallback135=false;this.radio63BeginFallback137(this.radio63FallbackMode&&this.radio63FallbackMode!=='manual'?this.radio63FallbackMode:(navigator.onLine===false?'offline':'stream'));return;}
+    if(!this.radio63OutageSince135)this.radio63OutageSince135=Date.now();
+    var elapsed=Date.now()-this.radio63OutageSince135,remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-elapsed);
+    if(remaining<=0){this.radio63BeginFallback137(navigator.onLine===false?'offline':'stream');return;}
+    this.radio63ScheduleGrace135(navigator.onLine===false?'offline':'stream');
+    this.reconnectAttempt+=1;
+    var offline=navigator.onLine===false,delay=offline?5000:Math.min(20000,1500*Math.pow(2,Math.min(this.reconnectAttempt,4)));
+    this.setPlayerState({status:'reconnecting',playing:false,detail:this.radio63FallbackCountdownText(remaining)});
+    this.reconnectTimer=setTimeout(function(){if(self.playerWanted&&self.audioKind==='radio')self.startStream();},Math.max(700,Math.min(delay,Math.max(700,remaining))));
+  };
+
+  /* Automatic local and Spotify backups both probe for a usable connection and
+     briefly retry the remembered live station. If that stream is still down,
+     radioFailure returns to the backup immediately instead of waiting 2 minutes. */
+  GoApp.prototype.radio63ScheduleReturnProbe135=function(){
+    var self=this;
+    clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+    if(['local-fallback','spotify-fallback'].indexOf(this.audioKind)<0||this.radio63FallbackMode==='manual'||!this.radio63FallbackStation)return;
+    this.radio63ReconnectProbeTimer135=setTimeout(function(){
+      if(['local-fallback','spotify-fallback'].indexOf(self.audioKind)<0||self.radio63FallbackMode==='manual'||!self.radio63FallbackStation)return;
+      if(navigator.onLine===false){self.radio63ScheduleReturnProbe135();return;}
+      self.radio63ProbeOrigin135().then(function(reachable){
+        if(['local-fallback','spotify-fallback'].indexOf(self.audioKind)<0||self.radio63FallbackMode==='manual')return;
+        if(reachable)self.radio63ReturnToRadio();else self.radio63ScheduleReturnProbe135();
+      });
+    },RADIO63_FALLBACK_PROBE_MS);
+  };
+
+  var radio63StartLocalFallback137=GoApp.prototype.radio63StartLocalFallback;
+  GoApp.prototype.radio63StartLocalFallback=function(reason,forcedIndex){
+    this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;this.radio63FallbackTransition137=false;this.radio63SpotifyFallbackPending137=null;
+    return radio63StartLocalFallback137.call(this,reason,forcedIndex);
+  };
+
+  var radio63PlayStation137=GoApp.prototype.playStation;
+  GoApp.prototype.playStation=function(station){
+    this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;this.radio63FallbackTransition137=false;this.radio63SpotifyFallbackPending137=null;
+    return radio63PlayStation137.call(this,station);
+  };
+
+  var radio63ReturnToRadio137=GoApp.prototype.radio63ReturnToRadio;
+  GoApp.prototype.radio63ReturnToRadio=function(){
+    if(this.audioKind==='spotify-fallback'&&this.radio63SpotifyFallbackActive137){
+      this.radio63SpotifyFallbackActive137=false;
+      if(this.state.user)this.api('spotify_control',{method:'POST',body:{command:'pause'},timeout:6000}).catch(function(){});
+    }
+    return radio63ReturnToRadio137.call(this);
+  };
+
+  var radio63PausePlayer137=GoApp.prototype.pausePlayer;
+  GoApp.prototype.pausePlayer=function(){
+    var self=this;this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;this.radio63FallbackTransition137=false;
+    if(this.audioKind==='spotify-fallback'){
+      clearTimeout(this.radio63ReconnectProbeTimer135);this.radio63ReconnectProbeTimer135=null;
+      if(this.state.user)this.api('spotify_control',{method:'POST',body:{command:'pause'},timeout:6000}).catch(function(){});
+      this.setPlayerState({status:'paused',playing:false,detail:radio63DriverText(this.state.lang,'spotifyPaused')});return;
+    }
+    return radio63PausePlayer137.call(this);
+  };
+  var radio63ResumePlayer137=GoApp.prototype.resumePlayer;
+  GoApp.prototype.resumePlayer=function(){
+    var self=this;
+    if(this.audioKind==='spotify-fallback'){
+      if(!this.state.user)return;
+      this.setPlayerState({status:'connecting',playing:false,detail:radio63DriverText(this.state.lang,'spotifyStarting')});
+      this.api('spotify_fallback_start',{method:'POST',body:{reason:'resume'},timeout:10000}).then(function(data){if(data&&data.started){self.setPlayerState({status:'playing',playing:true,detail:radio63DriverText(self.state.lang,'spotifyPlaying')+(data.deviceName?' · '+data.deviceName:'')});self.radio63ScheduleReturnProbe135();}else self.setPlayerState({status:'paused',playing:false,detail:radio63DriverText(self.state.lang,'spotifyUnavailable')});}).catch(function(){self.setPlayerState({status:'paused',playing:false,detail:radio63DriverText(self.state.lang,'spotifyUnavailable')});});
+      return;
+    }
+    return radio63ResumePlayer137.call(this);
+  };
+  var radio63TogglePlayer137=GoApp.prototype.togglePlayer;
+  GoApp.prototype.togglePlayer=function(){if(this.audioKind==='spotify-fallback'){if(this.state.player&&this.state.player.playing)this.pausePlayer();else this.resumePlayer();return;}return radio63TogglePlayer137.call(this);};
+  var radio63StopPlayer137=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){
+    this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;
+    if(this.audioKind==='spotify-fallback'&&this.radio63SpotifyFallbackActive137&&this.state.user)this.api('spotify_control',{method:'POST',body:{command:'pause'},timeout:6000}).catch(function(){});
+    this.radio63SpotifyFallbackActive137=false;this.radio63FallbackTransition137=false;this.radio63SpotifyFallbackPending137=null;
+    return radio63StopPlayer137.call(this);
+  };
+
+  /* When the browser/PWA returns to the foreground after another app, try the
+     existing live element first. If it cannot resume, the normal stream retry
+     machinery takes over. User-requested pause/stop is never overridden. */
+  GoApp.prototype.radio63RecoverDriverAudio137=function(){
+    var self=this;
+    if(this.audioKind!=='radio'||!this.playerWanted||navigator.onLine===false||!this.state.player||!this.state.player.station)return;
+    var audio=this.audio;if(audio&&!audio.paused&&!audio.ended&&!audio.error)return;
+    if(this.radio63DriverRecovering137)return;this.radio63DriverRecovering137=true;
+    function release(){self.radio63DriverRecovering137=false;}
+    if(audio&&!audio.ended&&!audio.error){
+      var p=null;try{p=audio.play();}catch(_){}
+      if(p&&p.then){p.then(function(){release();},function(){release();clearTimeout(self.reconnectTimer);self.startStream();});return;}
+    }
+    release();clearTimeout(this.reconnectTimer);this.startStream();
+  };
+
+  var radio63SetPlayerState137=GoApp.prototype.setPlayerState;
+  GoApp.prototype.setPlayerState=function(patch){
+    var result=radio63SetPlayerState137.call(this,patch);
+    if('mediaSession' in navigator&&this.audioKind!=='spotify-fallback'&&patch&&typeof patch.playing==='boolean'){
+      try{navigator.mediaSession.playbackState=patch.playing?'playing':'paused';}catch(_){}
+    }
+    return result;
+  };
+
+  GoApp.prototype.renderRadio63SpotifyFallback137=function(){
+    var self=this,lang=this.state.lang||'en',enabled=this.radio63SpotifyFallbackEnabled137(),config=this.state.spotifyConfig||{},status=this.state.spotifyStatus||{},connected=!!status.connected,playback=status.playback,item=playback&&playback.item,active=this.audioKind==='spotify-fallback';
+    var account;
+    if(!this.state.user)account=h('button',{type:'button',className:'btn primary',onClick:function(){self.setState({modal:'auth',authMode:'login'});}},this.t('signIn'));
+    else if(!config.enabled||!config.clientId)account=h('p',{className:'radio63-spotify-note'},this.t('spotifySetupRequired'));
+    else if(!connected)account=h('button',{type:'button',className:'btn spotify',onClick:this.startSpotifyConnect},this.t('connectSpotify'));
+    else account=h('span',{className:'radio63-spotify-ready'},'✓ ',radio63DriverText(lang,'spotifyReady'));
+    return h('section',{className:'panel radio63-spotify-backup'},
+      h('div',{className:'radio63-local-head'},h('div',null,h('span',{className:'eyebrow'},'DRIVER BACKUP'),h('h2',null,radio63DriverText(lang,'spotifyTitle')),h('p',null,radio63DriverText(lang,'spotifyDesc'))),h('span',{className:'radio63-driver-guard'},'✓ ',radio63DriverText(lang,'driverGuard'))),
+      h('div',{className:'radio63-local-switch'},h('div',null,h('strong',null,radio63DriverText(lang,'spotifyAuto')),h('span',null,radio63DriverText(lang,'spotifyAutoHelp'))),h('button',{type:'button',className:'switch '+(enabled?'on':''),'aria-pressed':enabled?'true':'false',onClick:function(){self.radio63SetSpotifyFallbackEnabled137(!enabled);}},h('span'))),
+      h('div',{className:'radio63-spotify-actions'},account,connected?h('button',{type:'button',className:'btn ghost small',onClick:function(){self.loadSpotifyStatus();}},'↻'):null,connected?h('button',{type:'button',className:'btn ghost small',onClick:this.disconnectSpotify},this.t('disconnectSpotify')):null,active?h('button',{type:'button',className:'btn secondary',onClick:function(){self.radio63ReturnToRadio();}},radio63DriverText(lang,'returnRadio')):null),
+      connected&&item?h('div',{className:'radio63-spotify-now'},item.album&&item.album.images&&item.album.images[0]?h('img',{src:item.album.images[0].url,alt:''}):null,h('div',null,h('strong',null,item.name),h('span',null,(item.artists||[]).map(function(a){return a.name;}).join(', ')))):null,
+      navigator.onLine===false?h('p',{className:'radio63-spotify-note'},radio63DriverText(lang,'spotifyOffline')):(!connected&&this.state.user&&config.enabled?h('p',{className:'radio63-spotify-note'},radio63DriverText(lang,'spotifyNotReady')):null),
+      h('p',{className:'radio63-driver-note'},radio63DriverText(lang,'driverGuardHelp'))
+    );
+  };
+
+  var radio63RenderView137=GoApp.prototype.renderRadioView;
+  GoApp.prototype.renderRadioView=function(){var base=radio63RenderView137.call(this),children=React.Children.toArray(base.props.children);children.push(this.renderRadio63SpotifyFallback137());return React.cloneElement(base,base.props,children);};
+
+  var radio63DidMount137=GoApp.prototype.componentDidMount;
+  GoApp.prototype.componentDidMount=function(){
+    var result=radio63DidMount137.call(this),self=this;
+    this.radio63DriverResumeHandler137=function(){if(document.visibilityState==='visible')setTimeout(function(){self.radio63RecoverDriverAudio137();},250);};
+    this.radio63DriverPageShowHandler137=function(){setTimeout(function(){self.radio63RecoverDriverAudio137();},250);};
+    document.addEventListener('visibilitychange',this.radio63DriverResumeHandler137);window.addEventListener('focus',this.radio63DriverResumeHandler137);window.addEventListener('pageshow',this.radio63DriverPageShowHandler137);
+    return result;
+  };
+  var radio63WillUnmount137=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){
+    if(this.radio63DriverResumeHandler137){document.removeEventListener('visibilitychange',this.radio63DriverResumeHandler137);window.removeEventListener('focus',this.radio63DriverResumeHandler137);}
+    if(this.radio63DriverPageShowHandler137)window.removeEventListener('pageshow',this.radio63DriverPageShowHandler137);
+    return radio63WillUnmount137.call(this);
+  };
 
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);

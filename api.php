@@ -825,6 +825,65 @@ try {
             }
             go_json_response(['ok' => true]);
 
+        case 'spotify_fallback_start':
+            if ($method !== 'POST') {
+                go_json_response(['ok' => false, 'message' => 'Method not allowed.'], 405);
+            }
+            $user = go_require_user();
+            if (!(bool)go_setting('features.spotify', false) || !(bool)go_setting('spotify.enabled', false)) {
+                go_json_response(['ok' => true, 'started' => false, 'reason' => 'disabled']);
+            }
+            $accessToken = go_spotify_access_token($user);
+            $headers = ['Authorization' => 'Bearer ' . $accessToken, 'Content-Type' => 'application/json'];
+            $device = null;
+            $current = go_http_request('https://api.spotify.com/v1/me/player', 'GET', ['Authorization' => 'Bearer ' . $accessToken], null, 8);
+            if ($current['status'] === 200) {
+                $currentData = json_decode($current['body'], true);
+                if (is_array($currentData) && is_array($currentData['device'] ?? null) && empty($currentData['device']['is_restricted']) && !empty($currentData['device']['id'])) {
+                    $device = $currentData['device'];
+                }
+            }
+            if (!$device) {
+                $devicesResponse = go_http_request('https://api.spotify.com/v1/me/player/devices', 'GET', ['Authorization' => 'Bearer ' . $accessToken], null, 8);
+                $devicesData = $devicesResponse['status'] === 200 ? json_decode($devicesResponse['body'], true) : null;
+                $devices = is_array($devicesData['devices'] ?? null) ? $devicesData['devices'] : [];
+                foreach ($devices as $candidate) {
+                    if (is_array($candidate) && !empty($candidate['id']) && empty($candidate['is_restricted']) && !empty($candidate['is_active'])) {
+                        $device = $candidate; break;
+                    }
+                }
+                if (!$device) {
+                    foreach ($devices as $candidate) {
+                        if (is_array($candidate) && !empty($candidate['id']) && empty($candidate['is_restricted'])) {
+                            $device = $candidate; break;
+                        }
+                    }
+                }
+            }
+            if (!$device || empty($device['id'])) {
+                go_json_response(['ok' => true, 'started' => false, 'reason' => 'no_device']);
+            }
+            $deviceId = (string)$device['id'];
+            $transferOk = false;
+            if (empty($device['is_active'])) {
+                $transferBody = json_encode(['device_ids' => [$deviceId], 'play' => true], JSON_UNESCAPED_SLASHES);
+                $transfer = go_http_request('https://api.spotify.com/v1/me/player', 'PUT', $headers, $transferBody, 8);
+                $transferOk = $transfer['status'] >= 200 && $transfer['status'] < 300;
+            }
+            $playUrl = 'https://api.spotify.com/v1/me/player/play?device_id=' . rawurlencode($deviceId);
+            $play = go_http_request($playUrl, 'PUT', $headers, '{}', 8);
+            $playOk = $play['status'] >= 200 && $play['status'] < 300;
+            if (!$playOk && !$transferOk) {
+                go_json_response(['ok' => true, 'started' => false, 'reason' => 'playback_failed', 'spotifyStatus' => (int)$play['status']]);
+            }
+            go_audit('spotify_fallback_started', ['deviceType' => (string)($device['type'] ?? '')]);
+            go_json_response([
+                'ok' => true,
+                'started' => true,
+                'deviceName' => (string)($device['name'] ?? ''),
+                'deviceType' => (string)($device['type'] ?? ''),
+            ]);
+
         case 'spotify_disconnect':
             if ($method !== 'POST') {
                 go_json_response(['ok' => false, 'message' => 'Method not allowed.'], 405);

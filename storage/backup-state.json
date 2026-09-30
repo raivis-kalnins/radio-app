@@ -1,9 +1,9 @@
 {
-    "lastDate": "2026-09-25",
+    "lastDate": "2026-09-30",
     "lastBackup": {
-        "file": "go-app-backup-20260925-101819.json.gz",
-        "size": 443,
-        "createdAt": "2026-09-25T10:18:19+01:00"
+        "file": "go-app-backup-20260930-093152.json.gz",
+        "size": 442,
+        "createdAt": "2026-09-30T09:31:52+01:00"
     },
-    "updatedAt": "2026-09-25T10:18:19+01:00"
+    "updatedAt": "2026-09-30T09:31:52+01:00"
 }
