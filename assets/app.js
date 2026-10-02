@@ -5409,6 +5409,242 @@
     return radio63WillUnmount137.call(this);
   };
 
+
+  /* Radio 63 1.3.9: transient mobile interruption shield.
+     Keep live radio as the primary source in the car. A short mobile-data drop
+     or another app taking audio focus must not immediately wake Spotify. Only
+     a fresh, continuous two-minute radio outage may enter the backup chain. */
+  var RADIO63_FOCUS_RETRY_MS_139 = 5000;
+  var RADIO63_FOREGROUND_SETTLE_MS_139 = 6000;
+  var RADIO63_RECENT_PROGRESS_MS_139 = 5000;
+
+  Object.assign(RADIO63_DRIVER_TEXT.en,{focusInterrupted:'Another app interrupted audio · keeping live radio selected'});
+  Object.assign(RADIO63_DRIVER_TEXT.lv,{focusInterrupted:'Cita lietotne pārtrauca audio · tiešraides radio paliek izvēlēts'});
+  Object.assign(RADIO63_DRIVER_TEXT.ru,{focusInterrupted:'Другое приложение прервало звук · эфир остаётся выбран'});
+  Object.assign(RADIO63_DRIVER_TEXT.uk,{focusInterrupted:'Інший застосунок перервав звук · ефір залишається вибраним'});
+
+  GoApp.prototype.radio63RadioHealthy139=function(){
+    var audio=this.audio,now=Date.now(),recent=now-Number(this.radio63LastProgressAt136||0)<RADIO63_RECENT_PROGRESS_MS_139;
+    return this.audioKind==='radio'&&this.playerWanted&&!!audio&&!audio.paused&&!audio.ended&&!audio.error&&(audio.readyState>=2||recent);
+  };
+
+  GoApp.prototype.radio63MarkHealthy139=function(){
+    var hadPending=!!this.radio63OutageSince135||!!this.radio63FallbackTransition137||!!this.radio63SpotifyFallbackPending137||!!this.radio63FocusInterrupted139;
+    clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;this.radio63OutageSince135=0;
+    clearTimeout(this.radio63FocusRetryTimer139);this.radio63FocusRetryTimer139=null;
+    this.radio63FocusInterrupted139=false;this.radio63RecoveringFromFallback135=false;this.radio63ReturningFromBackup139=false;
+    if(hadPending){this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;this.radio63FallbackTransition137=false;}
+  };
+
+  GoApp.prototype.radio63MarkFocusInterruption139=function(){
+    if(this.audioKind!=='radio'||!this.playerWanted)return;
+    this.radio63FocusInterrupted139=true;this.radio63OutageSince135=0;
+    clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;
+    this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;this.radio63FallbackTransition137=false;
+    this.setPlayerState({status:'reconnecting',playing:false,detail:radio63DriverText(this.state.lang,'focusInterrupted')});
+    this.radio63ScheduleFocusResume139();
+  };
+
+  GoApp.prototype.radio63ScheduleFocusResume139=function(){
+    var self=this;
+    clearTimeout(this.radio63FocusRetryTimer139);
+    if(!this.radio63FocusInterrupted139||this.audioKind!=='radio'||!this.playerWanted)return;
+    this.radio63FocusRetryTimer139=setTimeout(function(){
+      if(!self.radio63FocusInterrupted139||self.audioKind!=='radio'||!self.playerWanted)return;
+      if(navigator.onLine===false){
+        self.radio63FocusInterrupted139=false;self.radio63OutageSince135=Date.now();self.radio63ScheduleGrace135('offline');return;
+      }
+      var audio=self.audio;
+      if(audio&&audio.error){
+        self.radio63FocusInterrupted139=false;self.radio63OutageSince135=Date.now();self.radioFailure(self.streamAttempt);return;
+      }
+      if(audio&&!audio.ended){
+        var promise=null;try{promise=audio.play();}catch(_){}
+        if(promise&&promise.then){
+          promise.then(function(){if(self.audioKind==='radio'&&self.playerWanted)self.radio63MarkHealthy139();},function(){self.radio63ScheduleFocusResume139();});
+          return;
+        }
+      }
+      self.radio63ScheduleFocusResume139();
+    },RADIO63_FOCUS_RETRY_MS_139);
+  };
+
+  /* A recovered stream resets the outage clock even when a browser resumes
+     delivery without emitting a second `playing` event. */
+  var radio63SetupAudio139=GoApp.prototype.setupAudio;
+  GoApp.prototype.setupAudio=function(attempt){
+    radio63SetupAudio139.call(this,attempt);
+    var self=this,audio=this.audio,expected=attempt==null?this.streamAttempt:attempt,lastHealthyMark=0;
+    if(!audio||this.audioKind!=='radio')return;
+    function valid(){return audio===self.audio&&self.audioKind==='radio'&&expected===self.streamAttempt&&self.playerWanted;}
+    audio.addEventListener('playing',function(){if(valid())self.radio63MarkHealthy139();});
+    audio.addEventListener('timeupdate',function(){
+      if(!valid()||audio.paused||audio.ended||audio.error)return;
+      var now=Date.now();if(now-lastHealthyMark<1200)return;lastHealthyMark=now;self.radio63MarkHealthy139();
+    });
+    audio.addEventListener('pause',function(){
+      if(valid()&&document.visibilityState==='hidden'&&!audio.ended&&!audio.error)self.radio63MarkFocusInterruption139();
+    });
+  };
+
+  /* Never let an old/stale outage timestamp jump straight into backup. The
+     grace timer is restarted after a foreground recovery and cancelled as soon
+     as audio progress proves the station is healthy again. */
+  GoApp.prototype.radio63ScheduleGrace135=function(reason){
+    var self=this,now=Date.now();
+    if(this.audioKind!=='radio'||!this.playerWanted)return;
+    if(this.radio63FocusInterrupted139){clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;this.radio63OutageSince135=0;return;}
+    if(this.radio63RadioHealthy139()){this.radio63MarkHealthy139();return;}
+    if(Number(this.radio63ForegroundSettlingUntil139||0)>now){
+      this.radio63OutageSince135=0;clearTimeout(this.radio63GraceTimer135);
+      this.radio63GraceTimer135=setTimeout(function(){self.radio63ScheduleGrace135(reason);},Math.max(250,Number(this.radio63ForegroundSettlingUntil139)-now));
+      return;
+    }
+    if(!this.radio63OutageSince135)this.radio63OutageSince135=now;
+    clearTimeout(this.radio63GraceTimer135);
+    var remaining=Math.max(0,RADIO63_FALLBACK_GRACE_MS-(now-this.radio63OutageSince135));
+    this.radio63GraceTimer135=setTimeout(function(){
+      if(self.audioKind!=='radio'||!self.playerWanted)return;
+      if(self.radio63FocusInterrupted139)return;
+      if(self.radio63RadioHealthy139()){self.radio63MarkHealthy139();return;}
+      var elapsed=Date.now()-Number(self.radio63OutageSince135||Date.now());
+      if(elapsed<RADIO63_FALLBACK_GRACE_MS){self.radio63ScheduleGrace135(reason);return;}
+      self.radio63BeginFallback137(navigator.onLine===false?'offline':(reason||'stream'));
+    },Math.max(250,remaining));
+  };
+
+  var radio63FailureBefore139=GoApp.prototype.radioFailure;
+  GoApp.prototype.radioFailure=function(attempt){
+    if(this.audioKind==='radio'&&this.playerWanted&&this.radio63RadioHealthy139()){this.radio63MarkHealthy139();return;}
+    if(this.audioKind==='radio'&&this.playerWanted&&this.radio63FocusInterrupted139){
+      clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);this.failedStreamAttempt=-1;
+      this.setPlayerState({status:'reconnecting',playing:false,detail:radio63DriverText(this.state.lang,'focusInterrupted')});
+      this.radio63ScheduleFocusResume139();return;
+    }
+    if(Number(this.radio63ForegroundSettlingUntil139||0)>Date.now())this.radio63OutageSince135=0;
+    return radio63FailureBefore139.call(this,attempt);
+  };
+
+  var radio63BeginFallbackBefore139=GoApp.prototype.radio63BeginFallback137;
+  GoApp.prototype.radio63BeginFallback137=function(reason){
+    var now=Date.now(),returning=!!this.radio63ReturningFromBackup139;
+    if(this.audioKind==='radio'&&this.radio63RadioHealthy139()){this.radio63MarkHealthy139();return;}
+    if(this.radio63FocusInterrupted139){this.radio63OutageSince135=0;this.radio63ScheduleFocusResume139();return;}
+    if(!returning&&Number(this.radio63ForegroundSettlingUntil139||0)>now){this.radio63OutageSince135=0;this.radio63ScheduleGrace135(reason);return;}
+    if(!returning){
+      if(!this.radio63OutageSince135){this.radio63OutageSince135=now;this.radio63ScheduleGrace135(reason);return;}
+      if(now-this.radio63OutageSince135<RADIO63_FALLBACK_GRACE_MS){this.radio63ScheduleGrace135(reason);return;}
+    }
+    return radio63BeginFallbackBefore139.call(this,reason);
+  };
+
+  /* Confirm that the app origin is really reachable before asking Spotify to
+     start. navigator.onLine is not reliable enough on weak mobile networks.
+     If radio recovers while Spotify is being started, pause that Spotify start
+     again instead of stealing playback from the live station. */
+  GoApp.prototype.radio63TrySpotifyFallback137=function(reason){
+    var self=this,config=this.state.spotifyConfig||{},now=Date.now(),generation=Number(this.radio63FallbackGeneration137||0),returning=!!this.radio63ReturningFromBackup139;
+    if(!this.radio63SpotifyFallbackEnabled137()||navigator.onLine===false||!this.state.user||!config.enabled||!config.clientId)return Promise.resolve(false);
+    if(this.radio63FocusInterrupted139||this.radio63RadioHealthy139())return Promise.resolve(false);
+    if(!returning&&(!this.radio63OutageSince135||now-this.radio63OutageSince135<RADIO63_FALLBACK_GRACE_MS))return Promise.resolve(false);
+    if(this.radio63SpotifyFallbackPending137)return this.radio63SpotifyFallbackPending137;
+    if(now-Number(this.radio63LastSpotifyFallbackAttempt137||0)<RADIO63_SPOTIFY_RETRY_MS)return Promise.resolve(false);
+
+    var task=this.radio63ProbeOrigin135().then(function(reachable){
+      if(!reachable||navigator.onLine===false||self.radio63FocusInterrupted139||self.radio63RadioHealthy139())return false;
+      if(!returning&&(!self.radio63OutageSince135||Date.now()-self.radio63OutageSince135<RADIO63_FALLBACK_GRACE_MS))return false;
+      self.radio63ReturningFromBackup139=false;
+      self.radio63LastSpotifyFallbackAttempt137=Date.now();
+      self.setPlayerState({status:'reconnecting',playing:false,detail:radio63DriverText(self.state.lang,'spotifyStarting')});
+      return self.api('spotify_fallback_start',{method:'POST',body:{reason:reason||'stream'},timeout:10000}).then(function(data){
+        var invalid=generation!==Number(self.radio63FallbackGeneration137||0)||!self.state.player||!self.state.player.station||self.radio63FocusInterrupted139||self.radio63RadioHealthy139();
+        if(data&&data.started&&invalid){
+          if(self.state.user)self.api('spotify_control',{method:'POST',body:{command:'pause'},timeout:6000}).catch(function(){});
+          return false;
+        }
+        if(!data||!data.started||invalid)return false;
+        self.radio63ActivateSpotifyFallback137(reason,data);return true;
+      }).catch(function(){return false;});
+    }).catch(function(){return false;});
+
+    var wrapped=task.then(function(value){if(self.radio63SpotifyFallbackPending137===wrapped)self.radio63SpotifyFallbackPending137=null;return value;},function(){if(self.radio63SpotifyFallbackPending137===wrapped)self.radio63SpotifyFallbackPending137=null;return false;});
+    this.radio63SpotifyFallbackPending137=wrapped;
+    return wrapped;
+  };
+
+  var radio63ReturnToRadioBefore139=GoApp.prototype.radio63ReturnToRadio;
+  GoApp.prototype.radio63ReturnToRadio=function(){
+    this.radio63ReturningFromBackup139=true;this.radio63FocusInterrupted139=false;clearTimeout(this.radio63FocusRetryTimer139);
+    var result=radio63ReturnToRadioBefore139.call(this);if(result===false)this.radio63ReturningFromBackup139=false;return result;
+  };
+
+  var radio63PlayStationBefore139=GoApp.prototype.playStation;
+  GoApp.prototype.playStation=function(station){
+    this.radio63FocusInterrupted139=false;this.radio63ReturningFromBackup139=false;this.radio63ForegroundSettlingUntil139=0;clearTimeout(this.radio63FocusRetryTimer139);
+    return radio63PlayStationBefore139.call(this,station);
+  };
+
+  var radio63PausePlayerBefore139=GoApp.prototype.pausePlayer;
+  GoApp.prototype.pausePlayer=function(){
+    this.radio63FocusInterrupted139=false;this.radio63ReturningFromBackup139=false;this.radio63ForegroundSettlingUntil139=0;clearTimeout(this.radio63FocusRetryTimer139);
+    return radio63PausePlayerBefore139.call(this);
+  };
+  var radio63StopPlayerBefore139=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){
+    this.radio63FocusInterrupted139=false;this.radio63ReturningFromBackup139=false;this.radio63ForegroundSettlingUntil139=0;clearTimeout(this.radio63FocusRetryTimer139);
+    return radio63StopPlayerBefore139.call(this);
+  };
+
+  var radio63DidMount139=GoApp.prototype.componentDidMount;
+  GoApp.prototype.componentDidMount=function(){
+    var result=radio63DidMount139.call(this),self=this;
+    /* Replace the older online/offline callbacks so restored mobile data always
+       starts a fresh grace period rather than inheriting a nearly-expired one. */
+    if(this.radio63OfflineHandler135)window.removeEventListener('offline',this.radio63OfflineHandler135);
+    if(this.radio63OnlineHandler135)window.removeEventListener('online',this.radio63OnlineHandler135);
+    this.radio63OfflineHandler139=function(){
+      if(self.audioKind!=='radio'||!self.playerWanted)return;
+      self.radio63FocusInterrupted139=false;clearTimeout(self.radio63FocusRetryTimer139);self.radio63OutageSince135=Date.now();
+      self.radio63ScheduleGrace135('offline');
+      self.setPlayerState({status:'reconnecting',playing:false,detail:self.radio63FallbackCountdownText(RADIO63_FALLBACK_GRACE_MS)});
+    };
+    this.radio63OnlineHandler139=function(){
+      self.radio63FocusInterrupted139=false;clearTimeout(self.radio63FocusRetryTimer139);
+      if(['local-fallback','spotify-fallback'].indexOf(self.audioKind)>=0&&self.radio63FallbackStation&&self.radio63FallbackMode!=='manual'){self.radio63ReturnToRadio();return;}
+      if(self.audioKind==='radio'&&self.playerWanted){
+        self.radio63ClearGrace135(true);self.radio63ForegroundSettlingUntil139=Date.now()+RADIO63_FOREGROUND_SETTLE_MS_139;
+        clearTimeout(self.reconnectTimer);self.playerUrlIndex=0;self.reconnectAttempt=0;self.startStream();
+      }
+    };
+    window.addEventListener('offline',this.radio63OfflineHandler139);window.addEventListener('online',this.radio63OnlineHandler139);
+
+    this.radio63VisibilityHandler139=function(){
+      if(document.visibilityState==='hidden'){self.radio63BackgroundedAt139=Date.now();return;}
+      self.radio63FocusInterrupted139=false;clearTimeout(self.radio63FocusRetryTimer139);
+      if(self.audioKind!=='radio'||!self.playerWanted)return;
+      self.radio63ClearGrace135(true);self.radio63ForegroundSettlingUntil139=Date.now()+RADIO63_FOREGROUND_SETTLE_MS_139;
+      setTimeout(function(){if(self.audioKind==='radio'&&self.playerWanted)self.radio63RecoverDriverAudio137();},300);
+      setTimeout(function(){
+        if(self.audioKind!=='radio'||!self.playerWanted)return;
+        if(self.radio63RadioHealthy139()){self.radio63MarkHealthy139();return;}
+        self.radio63OutageSince135=Date.now();self.radio63ScheduleGrace135(navigator.onLine===false?'offline':'stream');
+      },RADIO63_FOREGROUND_SETTLE_MS_139);
+    };
+    document.addEventListener('visibilitychange',this.radio63VisibilityHandler139);
+    window.addEventListener('focus',this.radio63VisibilityHandler139);
+    window.addEventListener('pageshow',this.radio63VisibilityHandler139);
+    return result;
+  };
+
+  var radio63WillUnmount139=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){
+    clearTimeout(this.radio63FocusRetryTimer139);
+    if(this.radio63OfflineHandler139)window.removeEventListener('offline',this.radio63OfflineHandler139);
+    if(this.radio63OnlineHandler139)window.removeEventListener('online',this.radio63OnlineHandler139);
+    if(this.radio63VisibilityHandler139){document.removeEventListener('visibilitychange',this.radio63VisibilityHandler139);window.removeEventListener('focus',this.radio63VisibilityHandler139);window.removeEventListener('pageshow',this.radio63VisibilityHandler139);}
+    return radio63WillUnmount139.call(this);
+  };
+
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);
 }());
