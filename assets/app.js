@@ -5645,6 +5645,194 @@
     return radio63WillUnmount139.call(this);
   };
 
+
+  /* Radio 63 1.4.0: Wi-Fi <-> mobile-data handover recovery.
+     Android/Chromium can keep navigator.onLine=true while the active network
+     changes. In that case the old radio socket may die without an online or
+     offline event, while Spotify Connect keeps working on the new network.
+     Watch NetworkInformation changes, protect the live-radio grace period from
+     stale timers, and actively verify/rebuild the radio stream on the new
+     transport. Spotify/local backup stays audible until the app origin is
+     reachable, then the remembered live station is tried again automatically. */
+  var RADIO63_HANDOVER_PROTECT_MS_140 = 30000;
+  var RADIO63_HANDOVER_FIRST_CHECK_MS_140 = 1800;
+  var RADIO63_HANDOVER_FOLLOWUP_MS_140 = 4500;
+  var RADIO63_HANDOVER_MAX_CHECKS_140 = 4;
+
+  function radio63Connection140(){
+    return navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+  }
+
+  GoApp.prototype.radio63CancelHandover140=function(){
+    clearTimeout(this.radio63HandoverTimer140);this.radio63HandoverTimer140=null;
+    this.radio63HandoverChecks140=0;
+  };
+
+  GoApp.prototype.radio63ProtectHandover140=function(){
+    var now=Date.now();
+    this.radio63HandoverProtectUntil140=Math.max(Number(this.radio63HandoverProtectUntil140||0),now+RADIO63_HANDOVER_PROTECT_MS_140);
+    this.radio63ForegroundSettlingUntil139=Math.max(Number(this.radio63ForegroundSettlingUntil139||0),now+8000);
+    this.radio63FocusInterrupted139=false;clearTimeout(this.radio63FocusRetryTimer139);
+    this.radio63ReturningFromBackup139=false;this.radio63RecoveringFromFallback135=false;
+    this.radio63OutageSince135=0;clearTimeout(this.radio63GraceTimer135);this.radio63GraceTimer135=null;
+    this.radio63FallbackGeneration137=Number(this.radio63FallbackGeneration137||0)+1;
+    this.radio63FallbackTransition137=false;this.radio63SpotifyFallbackPending137=null;
+  };
+
+  GoApp.prototype.radio63FreshRadioRestart140=function(){
+    if(this.audioKind!=='radio'||!this.playerWanted||!this.state.player||!this.state.player.station)return false;
+    this.activeStation=this.radio63FallbackStation||this.activeStation||this.state.player.station;
+    if(!this.activeStation)return false;
+    this.playerCandidates=this.buildStreamCandidates(this.activeStation);
+    this.playerUrlIndex=0;this.reconnectAttempt=0;this.failedStreamAttempt=-1;
+    this.radio63ClearGrace135(true);this.radio63OutageSince135=0;
+    clearTimeout(this.audioTimer);clearTimeout(this.reconnectTimer);
+    this.setPlayerState({status:'reconnecting',playing:false,detail:this.t('radioRetrying')});
+    this.startStream(this.activeStation);
+    return true;
+  };
+
+  GoApp.prototype.radio63ScheduleHandoverRecovery140=function(delay){
+    var self=this;
+    clearTimeout(this.radio63HandoverTimer140);
+    this.radio63HandoverTimer140=setTimeout(function(){
+      self.radio63HandoverTimer140=null;
+      if(Date.now()>Number(self.radio63HandoverProtectUntil140||0))return;
+      var fallback=['local-fallback','spotify-fallback'].indexOf(self.audioKind)>=0;
+      var automaticFallback=fallback&&self.radio63FallbackStation&&self.radio63FallbackMode!=='manual';
+
+      if(navigator.onLine===false){
+        self.radio63HandoverChecks140=Number(self.radio63HandoverChecks140||0)+1;
+        if(self.radio63HandoverChecks140<RADIO63_HANDOVER_MAX_CHECKS_140)self.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FOLLOWUP_MS_140);
+        return;
+      }
+
+      if(automaticFallback){
+        self.radio63ProbeOrigin135().then(function(reachable){
+          if(!reachable||navigator.onLine===false){
+            self.radio63HandoverChecks140=Number(self.radio63HandoverChecks140||0)+1;
+            if(self.radio63HandoverChecks140<RADIO63_HANDOVER_MAX_CHECKS_140)self.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FOLLOWUP_MS_140);
+            return;
+          }
+          if(['local-fallback','spotify-fallback'].indexOf(self.audioKind)>=0&&self.radio63FallbackStation&&self.radio63FallbackMode!=='manual'){
+            self.radio63ProtectHandover140();
+            self.radio63ReturnToRadio();
+            self.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FOLLOWUP_MS_140);
+          }
+        });
+        return;
+      }
+
+      if(self.audioKind!=='radio'||!self.playerWanted)return;
+      var progress=Number(self.radio63LastProgressAt136||0),baseline=Number(self.radio63HandoverProgressMark140||0);
+      var progressed=progress>baseline+250&&self.radio63RadioHealthy139();
+      self.radio63HandoverProgressMark140=progress;
+      self.radio63HandoverChecks140=Number(self.radio63HandoverChecks140||0)+1;
+
+      if(progressed){
+        if(self.radio63HandoverChecks140<RADIO63_HANDOVER_MAX_CHECKS_140)self.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FOLLOWUP_MS_140);
+        else{self.radio63HandoverProtectUntil140=0;self.radio63CancelHandover140();self.radio63MarkHealthy139();}
+        return;
+      }
+
+      self.radio63ProbeOrigin135().then(function(reachable){
+        if(self.audioKind!=='radio'||!self.playerWanted)return;
+        if(reachable&&navigator.onLine!==false){
+          self.radio63ProtectHandover140();
+          self.radio63HandoverProgressMark140=Date.now();
+          self.radio63FreshRadioRestart140();
+        }else{
+          self.radio63OutageSince135=Date.now();
+          self.radio63ScheduleGrace135(navigator.onLine===false?'offline':'stream');
+        }
+        if(Number(self.radio63HandoverChecks140||0)<RADIO63_HANDOVER_MAX_CHECKS_140)self.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FOLLOWUP_MS_140);
+      });
+    },Math.max(250,Number(delay||RADIO63_HANDOVER_FIRST_CHECK_MS_140)));
+  };
+
+  GoApp.prototype.radio63HandleNetworkHandover140=function(){
+    var now=Date.now();
+    if(now-Number(this.radio63LastHandoverEvent140||0)<700){
+      this.radio63LastHandoverEvent140=now;return;
+    }
+    this.radio63LastHandoverEvent140=now;
+    if(this.audioKind==='radio'&&!this.playerWanted)return;
+    if(['local-fallback','spotify-fallback'].indexOf(this.audioKind)>=0&&this.state.player&&this.state.player.playing===false)return;
+    if(['radio','local-fallback','spotify-fallback'].indexOf(this.audioKind)<0)return;
+    this.radio63ProtectHandover140();
+    this.radio63HandoverChecks140=0;
+    this.radio63HandoverProgressMark140=Number(this.radio63LastProgressAt136||0);
+    this.radio63ScheduleHandoverRecovery140(RADIO63_HANDOVER_FIRST_CHECK_MS_140);
+  };
+
+  /* During a real network handover, a return-from-backup stream can fail while
+     the new route/DNS/socket is still settling. Do not bounce straight back to
+     Spotify in that protected window; restart the two-minute live-radio grace
+     period and keep rebuilding the live stream first. */
+  var radio63FailureBefore140=GoApp.prototype.radioFailure;
+  GoApp.prototype.radioFailure=function(attempt){
+    if(this.audioKind==='radio'&&this.playerWanted&&Date.now()<Number(this.radio63HandoverProtectUntil140||0)){
+      this.radio63ReturningFromBackup139=false;this.radio63RecoveringFromFallback135=false;
+      if(!this.radio63OutageSince135)this.radio63OutageSince135=Date.now();
+    }
+    return radio63FailureBefore140.call(this,attempt);
+  };
+
+  var radio63BeginFallbackBefore140=GoApp.prototype.radio63BeginFallback137;
+  GoApp.prototype.radio63BeginFallback137=function(reason){
+    if(this.audioKind==='radio'&&this.playerWanted&&Date.now()<Number(this.radio63HandoverProtectUntil140||0)){
+      this.radio63ReturningFromBackup139=false;this.radio63RecoveringFromFallback135=false;
+      this.radio63OutageSince135=Date.now();
+      this.radio63ScheduleGrace135(reason||'stream');
+      this.radio63ScheduleHandoverRecovery140(900);
+      return;
+    }
+    return radio63BeginFallbackBefore140.call(this,reason);
+  };
+
+  var radio63PlayStationBefore140=GoApp.prototype.playStation;
+  GoApp.prototype.playStation=function(station){
+    this.radio63HandoverProtectUntil140=0;this.radio63CancelHandover140();
+    return radio63PlayStationBefore140.call(this,station);
+  };
+
+  var radio63PausePlayerBefore140=GoApp.prototype.pausePlayer;
+  GoApp.prototype.pausePlayer=function(){
+    this.radio63HandoverProtectUntil140=0;this.radio63CancelHandover140();
+    return radio63PausePlayerBefore140.call(this);
+  };
+
+  var radio63StopPlayerBefore140=GoApp.prototype.stopPlayer;
+  GoApp.prototype.stopPlayer=function(){
+    this.radio63HandoverProtectUntil140=0;this.radio63CancelHandover140();
+    return radio63StopPlayerBefore140.call(this);
+  };
+
+  var radio63DidMount140=GoApp.prototype.componentDidMount;
+  GoApp.prototype.componentDidMount=function(){
+    var result=radio63DidMount140.call(this),self=this,connection=radio63Connection140();
+    this.radio63Connection140=connection;
+    this.radio63ConnectionChangeHandler140=function(){self.radio63HandleNetworkHandover140();};
+    if(connection&&typeof connection.addEventListener==='function')connection.addEventListener('change',this.radio63ConnectionChangeHandler140);
+    this.radio63OnlineHandoverHandler140=function(){
+      if(self.audioKind==='radio'&&!self.playerWanted)return;
+      if(['local-fallback','spotify-fallback'].indexOf(self.audioKind)>=0&&self.state.player&&self.state.player.playing===false)return;
+      if(['radio','local-fallback','spotify-fallback'].indexOf(self.audioKind)<0)return;
+      self.radio63ProtectHandover140();self.radio63HandoverChecks140=0;self.radio63HandoverProgressMark140=Number(self.radio63LastProgressAt136||0);
+      self.radio63ScheduleHandoverRecovery140(700);
+    };
+    window.addEventListener('online',this.radio63OnlineHandoverHandler140);
+    return result;
+  };
+
+  var radio63WillUnmount140=GoApp.prototype.componentWillUnmount;
+  GoApp.prototype.componentWillUnmount=function(){
+    this.radio63CancelHandover140();
+    if(this.radio63Connection140&&this.radio63ConnectionChangeHandler140&&typeof this.radio63Connection140.removeEventListener==='function')this.radio63Connection140.removeEventListener('change',this.radio63ConnectionChangeHandler140);
+    if(this.radio63OnlineHandoverHandler140)window.removeEventListener('online',this.radio63OnlineHandoverHandler140);
+    return radio63WillUnmount140.call(this);
+  };
+
   var root = document.getElementById('go-app-root');
   ReactDOM.render(h(AppErrorBoundary,null,h(GoApp)), root);
 }());

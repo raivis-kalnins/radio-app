@@ -151,7 +151,7 @@ GO 63 is the separate map/navigation app. Each application includes a link to th
 
 ## Version
 
-Current build: **Radio 63 v1.3.9**
+Current build: **Radio 63 v1.4.0**
 
 
 ## v1.2.8 Latvian public radio reliability
@@ -181,6 +181,15 @@ Radio 63 now supports HLS (`.m3u8`) streams through Hls.js in browsers without n
 - Added a per-country **Add stations** panel that searches the live Radio Browser directory and lets users save additional stations locally.
 - Added playback relay resolution for stations added from directory search by station UUID.
 - Localized the main Radio 63 station interface in English, Latvian, Russian and Ukrainian so changing language continues to apply after the welcome page.
+
+
+## 1.4.0 Wi-Fi / 5G handover recovery
+
+- Detects Network Information API connection changes even when Android/Chromium never reports an offline event during Wi-Fi <-> mobile-data handover.
+- Protects live radio from stale Spotify fallback timers for 30 seconds while the new network route settles.
+- Checks the app origin and rebuilds the live radio stream on the new transport when stream progress stops after a handover.
+- If Spotify or local backup is already running, automatically retries the remembered live station as soon as the new connection is usable instead of leaving Spotify running indefinitely.
+- Keeps the existing two-minute outage rule before a fresh automatic Spotify fallback can start.
 
 
 ## 1.3.9 mobile radio continuity fix
